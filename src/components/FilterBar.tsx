@@ -35,15 +35,31 @@ export function FilterBar({ filters, onChange, genres, tags }: Props) {
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     onChange({ ...filters, [key]: value })
 
+  // Sort is a display preference, not a filter — clearing filters leaves it alone.
+  const { sort: _sort, ...activeFilterFields } = filters
+  const { sort: _defaultSort, ...defaultFilterFields } = DEFAULT_FILTERS
+  const hasActiveFilters = JSON.stringify(activeFilterFields) !== JSON.stringify(defaultFilterFields)
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/40 p-3">
-      <input
-        type="search"
-        placeholder="Search title..."
-        value={filters.query}
-        onChange={(e) => set('query', e.target.value)}
-        className="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
-      />
+      <div className="flex gap-2">
+        <input
+          type="search"
+          placeholder="Search title..."
+          value={filters.query}
+          onChange={(e) => set('query', e.target.value)}
+          className="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+        />
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={() => onChange({ ...DEFAULT_FILTERS, sort: filters.sort })}
+            className="rounded border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:border-red-400 hover:text-red-400"
+          >
+            Clear filters
+          </button>
+        ) : null}
+      </div>
       <div className="flex flex-wrap gap-2">
         <select
           value={filters.kind}
