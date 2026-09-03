@@ -1,5 +1,21 @@
 import { nanoid } from 'nanoid'
-import type { Movie, WatchSession } from '../types'
+import type { Movie, StreamingAvailability, WatchSession } from '../types'
+
+/** Accepts the old `streaming: string[]` shape as well as the current `{ service, price? }[]` shape. */
+function normalizeStreamingEntry(raw: unknown): StreamingAvailability | null {
+  if (typeof raw === 'string') {
+    const service = raw.trim()
+    return service ? { service } : null
+  }
+  if (raw && typeof raw === 'object' && typeof (raw as { service?: unknown }).service === 'string') {
+    const service = (raw as { service: string }).service.trim()
+    if (!service) return null
+    const rawPrice = (raw as { price?: unknown }).price
+    const price = typeof rawPrice === 'number' && Number.isFinite(rawPrice) ? rawPrice : undefined
+    return { service, price }
+  }
+  return null
+}
 
 /**
  * Fills in whatever a hand-written movie entry leaves out (id, addedAt, arrays)
@@ -10,6 +26,7 @@ export function normalizeMovie(raw: Partial<Movie>): Movie {
   if (!raw.title || typeof raw.title !== 'string') {
     throw new Error('Every movie needs a "title".')
   }
+  const addedAt = raw.addedAt && typeof raw.addedAt === 'string' ? raw.addedAt : new Date().toISOString()
   return {
     id: raw.id && typeof raw.id === 'string' ? raw.id : nanoid(),
     title: raw.title,
@@ -21,9 +38,12 @@ export function normalizeMovie(raw: Partial<Movie>): Movie {
     notes: raw.notes,
     availability: {
       physical: Array.isArray(raw.availability?.physical) ? raw.availability.physical : [],
-      streaming: Array.isArray(raw.availability?.streaming) ? raw.availability.streaming : [],
+      streaming: Array.isArray(raw.availability?.streaming)
+        ? raw.availability.streaming.map(normalizeStreamingEntry).filter((s): s is StreamingAvailability => s !== null)
+        : [],
     },
-    addedAt: raw.addedAt && typeof raw.addedAt === 'string' ? raw.addedAt : new Date().toISOString(),
+    addedAt,
+    updatedAt: raw.updatedAt && typeof raw.updatedAt === 'string' ? raw.updatedAt : addedAt,
   }
 }
 

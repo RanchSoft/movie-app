@@ -1,6 +1,7 @@
 import type { Movie, MovieStats } from '../types'
 import { computeRating } from '../ratingSources'
 import { formatRuntime } from '../utils/format'
+import { isFreeToWatch } from '../utils/availability'
 
 interface Props {
   movie: Movie
@@ -15,6 +16,7 @@ interface Props {
 
 export function RandomPickModal({ movie, stats, poolSize, inShortlist, onReroll, onToggleShortlist, onEdit, onClose }: Props) {
   const rating = computeRating(movie.ratingSources)
+  const free = isFreeToWatch(movie)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={onClose}>
@@ -54,7 +56,13 @@ export function RandomPickModal({ movie, stats, poolSize, inShortlist, onReroll,
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
               <span>{formatRuntime(movie.runtimeMinutes)}</span>
               {rating !== null ? <span>★ {rating}/5</span> : null}
+              {free ? <span className="text-emerald-400">Free</span> : null}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               {stats.timesWatched > 0 ? <span className="text-emerald-400">Watched {stats.timesWatched}×</span> : null}
+              {stats.timesShortlisted > 0 ? (
+                <span className="text-slate-400">Shortlisted {stats.timesShortlisted}×</span>
+              ) : null}
             </div>
             {movie.availability.physical.length > 0 || movie.availability.streaming.length > 0 ? (
               <div className="mt-1 flex flex-wrap gap-1 text-xs text-slate-500">
@@ -64,8 +72,9 @@ export function RandomPickModal({ movie, stats, poolSize, inShortlist, onReroll,
                   </span>
                 ))}
                 {movie.availability.streaming.map((s) => (
-                  <span key={s} className="rounded border border-slate-700 px-1.5 py-0.5">
-                    {s}
+                  <span key={s.service} className="rounded border border-slate-700 px-1.5 py-0.5">
+                    {s.service}
+                    {s.price ? ` $${s.price}` : ''}
                   </span>
                 ))}
               </div>

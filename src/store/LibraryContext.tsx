@@ -7,8 +7,8 @@ import { loadLibrary, saveLibrary } from './storage'
 interface LibraryContextValue {
   movies: Movie[]
   sessions: WatchSession[]
-  addMovie: (movie: Omit<Movie, 'id' | 'addedAt'>) => Movie
-  updateMovie: (id: string, updates: Partial<Omit<Movie, 'id' | 'addedAt'>>) => void
+  addMovie: (movie: Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>) => Movie
+  updateMovie: (id: string, updates: Partial<Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>>) => void
   deleteMovie: (id: string) => void
   addSession: (session: Omit<WatchSession, 'id'>) => WatchSession
   deleteSession: (id: string) => void
@@ -55,14 +55,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       movies: data.movies,
       sessions: data.sessions,
       addMovie: (movie) => {
-        const newMovie: Movie = { ...movie, id: nanoid(), addedAt: new Date().toISOString() }
+        const now = new Date().toISOString()
+        const newMovie: Movie = { ...movie, id: nanoid(), addedAt: now, updatedAt: now }
         setData((prev) => ({ ...prev, movies: [...prev.movies, newMovie] }))
         return newMovie
       },
       updateMovie: (id, updates) => {
         setData((prev) => ({
           ...prev,
-          movies: prev.movies.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+          movies: prev.movies.map((m) =>
+            m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m,
+          ),
         }))
       },
       deleteMovie: (id) => {

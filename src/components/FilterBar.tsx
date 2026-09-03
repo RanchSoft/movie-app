@@ -2,9 +2,9 @@ export interface Filters {
   query: string
   genre: string
   maxRuntime: number | null
-  availability: 'all' | 'physical' | 'streaming'
+  availability: 'all' | 'physical' | 'streaming' | 'free'
   watched: 'all' | 'watched' | 'unwatched'
-  sort: 'title' | 'rating' | 'timesWatched' | 'lastWatched' | 'timesShortlisted' | 'year'
+  sort: 'title' | 'rating' | 'timesWatched' | 'lastWatched' | 'timesShortlisted' | 'year' | 'updatedAt'
 }
 
 export const DEFAULT_FILTERS: Filters = {
@@ -56,6 +56,7 @@ export function FilterBar({ filters, onChange, genres }: Props) {
           <option value="all">Any availability</option>
           <option value="physical">Physical only</option>
           <option value="streaming">Streaming only</option>
+          <option value="free">Free only</option>
         </select>
         <select
           value={filters.watched}
@@ -87,6 +88,7 @@ export function FilterBar({ filters, onChange, genres }: Props) {
           <option value="timesWatched">Sort: Times watched</option>
           <option value="lastWatched">Sort: Last watched</option>
           <option value="timesShortlisted">Sort: Appears in lists</option>
+          <option value="updatedAt">Sort: Last updated</option>
         </select>
       </div>
     </div>

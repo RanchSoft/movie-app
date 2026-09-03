@@ -22,6 +22,10 @@ export function useShortlist() {
     setShortlist((prev) => (prev.includes(movieId) ? prev : [...prev, movieId]))
   }, [])
 
+  const addMany = useCallback((movieIds: string[]) => {
+    setShortlist((prev) => [...prev, ...movieIds.filter((id) => !prev.includes(id))])
+  }, [])
+
   const remove = useCallback((movieId: string) => {
     setShortlist((prev) => prev.filter((id) => id !== movieId))
   }, [])
@@ -34,5 +38,5 @@ export function useShortlist() {
 
   const clear = useCallback(() => setShortlist([]), [])
 
-  return { shortlist, add, remove, toggle, clear }
+  return { shortlist, add, addMany, remove, toggle, clear }
 }

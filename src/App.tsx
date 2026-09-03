@@ -17,14 +17,14 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 function AppShell() {
   const [tab, setTab] = useState<Tab>('library')
-  const { shortlist, toggle, remove, clear } = useShortlist()
+  const { shortlist, toggle, remove, clear, addMany } = useShortlist()
 
   return (
     <div className="mx-auto flex min-h-screen max-w-4xl flex-col bg-slate-950 pb-20 text-slate-100">
       <main className="flex-1 p-3 sm:p-4">
         {tab === 'library' ? <LibraryView shortlist={shortlist} onToggleShortlist={toggle} /> : null}
         {tab === 'shortlist' ? <ShortlistView shortlist={shortlist} onRemove={remove} onClear={clear} /> : null}
-        {tab === 'history' ? <HistoryView /> : null}
+        {tab === 'history' ? <HistoryView onAddToShortlist={addMany} /> : null}
         {tab === 'settings' ? <SettingsView /> : null}
       </main>
 

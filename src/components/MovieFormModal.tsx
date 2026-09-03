@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Movie, MovieStats, PhysicalCopy, PhysicalFormat } from '../types'
+import type { Movie, MovieStats, PhysicalCopy, PhysicalFormat, StreamingAvailability } from '../types'
 import { parseTagList, formatDate } from '../utils/format'
 import { computeRating, RATING_SOURCES } from '../ratingSources'
 
@@ -9,7 +9,7 @@ const PHYSICAL_FORMATS: PhysicalFormat[] = ['DVD', 'Blu-ray', '4K UHD', 'VHS', '
 interface Props {
   initial: Movie | null
   stats: MovieStats | null
-  onSave: (movie: Omit<Movie, 'id' | 'addedAt'>) => void
+  onSave: (movie: Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>) => void
   onDelete?: () => void
   onClose: () => void
 }
@@ -25,13 +25,18 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
   })
   const [posterUrl, setPosterUrl] = useState(initial?.posterUrl ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
-  const [streaming, setStreaming] = useState(initial?.availability.streaming.join(', ') ?? '')
+  const [streaming, setStreaming] = useState<StreamingAvailability[]>(initial?.availability.streaming ?? [])
   const [physical, setPhysical] = useState<PhysicalCopy[]>(initial?.availability.physical ?? [])
 
   const addPhysicalCopy = () => setPhysical((p) => [...p, { format: 'Blu-ray' }])
   const updatePhysicalCopy = (idx: number, updates: Partial<PhysicalCopy>) =>
     setPhysical((p) => p.map((c, i) => (i === idx ? { ...c, ...updates } : c)))
   const removePhysicalCopy = (idx: number) => setPhysical((p) => p.filter((_, i) => i !== idx))
+
+  const addStreaming = () => setStreaming((s) => [...s, { service: '' }])
+  const updateStreaming = (idx: number, updates: Partial<StreamingAvailability>) =>
+    setStreaming((s) => s.map((entry, i) => (i === idx ? { ...entry, ...updates } : entry)))
+  const removeStreaming = (idx: number) => setStreaming((s) => s.filter((_, i) => i !== idx))
 
   const canSave = title.trim().length > 0
 
@@ -52,7 +57,12 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
       ratingSources,
       posterUrl: posterUrl.trim() || undefined,
       notes: notes.trim() || undefined,
-      availability: { physical, streaming: parseTagList(streaming) },
+      availability: {
+        physical,
+        streaming: streaming
+          .filter((s) => s.service.trim())
+          .map((s) => ({ service: s.service.trim(), price: s.price })),
+      },
     })
   }
 
@@ -62,12 +72,14 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-xl border border-slate-700 bg-slate-900 p-4 sm:rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-1 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-100">{initial ? 'Edit movie' : 'Add movie'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
             ✕
           </button>
         </div>
+
+        {initial ? <p className="mb-3 text-xs text-slate-500">Last updated {formatDate(initial.updatedAt)}</p> : null}
 
         {stats && (stats.timesWatched > 0 || stats.timesShortlisted > 0) ? (
           <div className="mb-3 rounded bg-slate-800 p-2 text-xs text-slate-400">
@@ -152,9 +164,38 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
             </div>
           </div>
 
-          <Field label="Streaming services (comma separated)">
-            <input value={streaming} onChange={(e) => setStreaming(e.target.value)} className={inputCls} placeholder="Netflix, Max" />
-          </Field>
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-400">Streaming services</span>
+              <button type="button" onClick={addStreaming} className="text-xs text-emerald-400 hover:underline">
+                + Add service
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {streaming.map((entry, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input
+                    value={entry.service}
+                    onChange={(e) => updateStreaming(idx, { service: e.target.value })}
+                    placeholder="Netflix"
+                    className={`${inputCls} flex-1`}
+                  />
+                  <input
+                    value={entry.price?.toString() ?? ''}
+                    onChange={(e) =>
+                      updateStreaming(idx, { price: e.target.value ? Number(e.target.value) : undefined })
+                    }
+                    placeholder="Free"
+                    inputMode="decimal"
+                    className={`${inputCls} w-24`}
+                  />
+                  <button type="button" onClick={() => removeStreaming(idx)} className="px-2 text-slate-400 hover:text-red-400">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <Field label="Notes">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className={`${inputCls} h-16 resize-none`} />
@@ -194,8 +235,12 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
   )
 }
 
+// No width utility here on purpose: callers that need a specific width append
+// their own (flex-1, w-24, ...); plain Field usages get it for free from the
+// parent label's flex-col stretch. Combining this with w-full caused the
+// width utilities to fight (see the physical-copy/streaming rows).
 const inputCls =
-  'w-full rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500'
+  'rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500'
 
 function Field({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (

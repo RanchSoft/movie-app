@@ -7,6 +7,7 @@ import type { Filters } from './FilterBar'
 import { MovieFormModal } from './MovieFormModal'
 import { RandomPickModal } from './RandomPickModal'
 import { computeRating } from '../ratingSources'
+import { isFreeToWatch } from '../utils/availability'
 
 interface Props {
   shortlist: string[]
@@ -31,6 +32,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
       if (filters.maxRuntime && (m.runtimeMinutes ?? Infinity) > filters.maxRuntime) return false
       if (filters.availability === 'physical' && m.availability.physical.length === 0) return false
       if (filters.availability === 'streaming' && m.availability.streaming.length === 0) return false
+      if (filters.availability === 'free' && !isFreeToWatch(m)) return false
       const stats = statsFor(m.id)
       if (filters.watched === 'watched' && stats.timesWatched === 0) return false
       if (filters.watched === 'unwatched' && stats.timesWatched > 0) return false
@@ -51,6 +53,8 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
           return sb.timesShortlisted - sa.timesShortlisted
         case 'lastWatched':
           return (sb.lastWatchedDate ?? '').localeCompare(sa.lastWatchedDate ?? '')
+        case 'updatedAt':
+          return b.updatedAt.localeCompare(a.updatedAt)
         default:
           return a.title.localeCompare(b.title)
       }

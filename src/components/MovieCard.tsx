@@ -1,6 +1,7 @@
 import type { Movie, MovieStats } from '../types'
 import { formatRuntime } from '../utils/format'
 import { computeRating } from '../ratingSources'
+import { isFreeToWatch } from '../utils/availability'
 
 interface Props {
   movie: Movie
@@ -12,6 +13,9 @@ interface Props {
 
 export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onEdit }: Props) {
   const rating = computeRating(movie.ratingSources)
+  const free = isFreeToWatch(movie)
+  // Considered often but rarely actually picked — worth surfacing.
+  const isBridesmaid = stats.timesShortlisted >= 3 && stats.timesWatched === 0
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800/60">
       <button
@@ -38,10 +42,18 @@ export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onEdit
         </div>
         <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
           <span>{formatRuntime(movie.runtimeMinutes)}</span>
-          {rating !== null ? <span>★ {rating}/5</span> : null}
+          <div className="flex items-center gap-2">
+            {rating !== null ? <span>★ {rating}/5</span> : null}
+            {free ? <span className="text-emerald-400">Free</span> : null}
+          </div>
         </div>
         {stats.timesWatched > 0 ? (
           <div className="text-xs text-emerald-400">Watched {stats.timesWatched}×</div>
+        ) : null}
+        {stats.timesShortlisted > 0 ? (
+          <div className={`text-xs ${isBridesmaid ? 'text-amber-400' : 'text-slate-400'}`}>
+            Shortlisted {stats.timesShortlisted}×
+          </div>
         ) : null}
         <button
           type="button"

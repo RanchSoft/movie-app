@@ -5,9 +5,15 @@ export interface PhysicalCopy {
   location?: string
 }
 
+export interface StreamingAvailability {
+  service: string
+  /** USD. Omitted/undefined means free (included with a subscription you already have). */
+  price?: number
+}
+
 export interface Availability {
   physical: PhysicalCopy[]
-  streaming: string[]
+  streaming: StreamingAvailability[]
 }
 
 export interface Movie {
@@ -21,6 +27,7 @@ export interface Movie {
   notes?: string
   availability: Availability
   addedAt: string
+  updatedAt: string
 }
 
 export type PickMethod = 'random' | 'manual'

@@ -1,8 +1,16 @@
+import { useState } from 'react'
 import { useLibrary } from '../store/LibraryContext'
 import { formatDate } from '../utils/format'
+import { AddSessionToShortlistModal } from './AddSessionToShortlistModal'
+import type { WatchSession } from '../types'
 
-export function HistoryView() {
-  const { movies, sessions, deleteSession } = useLibrary()
+interface Props {
+  onAddToShortlist: (movieIds: string[]) => void
+}
+
+export function HistoryView({ onAddToShortlist }: Props) {
+  const { movies, sessions, deleteSession, statsFor } = useLibrary()
+  const [pendingSession, setPendingSession] = useState<WatchSession | null>(null)
 
   const sorted = sessions.slice().sort((a, b) => b.date.localeCompare(a.date))
   const titleFor = (id: string | null) => movies.find((m) => m.id === id)?.title ?? '(deleted movie)'
@@ -17,18 +25,22 @@ export function HistoryView() {
           {sorted.map((session) => (
             <div key={session.id} className="rounded-lg border border-slate-700 bg-slate-800/40 p-3">
               <div className="flex items-start justify-between">
-                <div>
+                <button
+                  type="button"
+                  onClick={() => setPendingSession(session)}
+                  className="flex-1 text-left"
+                >
                   <p className="text-xs text-slate-400">{formatDate(session.date)}</p>
-                  <p className="text-base font-semibold text-slate-100">
+                  <p className="text-base font-semibold text-slate-100 hover:underline">
                     {session.pickedMovieId ? titleFor(session.pickedMovieId) : '(no pick recorded)'}
                   </p>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     if (confirm('Delete this history entry?')) deleteSession(session.id)
                   }}
-                  className="text-slate-500 hover:text-red-400"
+                  className="px-2 text-slate-500 hover:text-red-400"
                 >
                   ✕
                 </button>
@@ -46,6 +58,16 @@ export function HistoryView() {
           ))}
         </div>
       )}
+
+      {pendingSession ? (
+        <AddSessionToShortlistModal
+          session={pendingSession}
+          movies={movies}
+          statsFor={statsFor}
+          onConfirm={onAddToShortlist}
+          onClose={() => setPendingSession(null)}
+        />
+      ) : null}
     </div>
   )
 }
