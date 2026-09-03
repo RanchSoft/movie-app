@@ -80,7 +80,7 @@ export function RandomPickModal({ movie, stats, poolSize, inShortlist, onReroll,
                 {movie.availability.streaming.map((s) => (
                   <span key={s.service} className="rounded border border-slate-700 px-1.5 py-0.5">
                     {s.service}
-                    {s.price ? ` $${s.price}` : ''}
+                    {s.price ? ` $${s.price}` : s.paid ? ' (paid)' : ''}
                   </span>
                 ))}
               </div>

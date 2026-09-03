@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { useLibrary } from '../store/LibraryContext'
 import { exportLibraryFile, parseImportedLibrary } from '../store/storage'
 import { useTmdbKey } from '../store/useTmdbKey'
+import { useStreamingPrefs } from '../store/useStreamingPrefs'
+import { parseTagList } from '../utils/format'
 
 export function SettingsView() {
   const { movies, sessions, replaceAll } = useLibrary()
@@ -9,6 +11,10 @@ export function SettingsView() {
   const { apiKey, setApiKey } = useTmdbKey()
   const [keyDraft, setKeyDraft] = useState(apiKey)
   const [keySaved, setKeySaved] = useState(false)
+  const { services, setServices, region, setRegion } = useStreamingPrefs()
+  const [servicesDraft, setServicesDraft] = useState(services.join(', '))
+  const [regionDraft, setRegionDraft] = useState(region)
+  const [prefsSaved, setPrefsSaved] = useState(false)
 
   const handleExport = () => {
     exportLibraryFile({ version: 1, movies, sessions })
@@ -104,6 +110,54 @@ export function SettingsView() {
           </button>
         </div>
         {keySaved ? <p className="mt-1 text-xs text-emerald-400">Saved.</p> : null}
+      </div>
+
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+        <h2 className="font-medium text-slate-100">Your streaming services</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          When you pick a TMDb search result while adding a title, we check where it's available and
+          auto-fill any of these services — included-with-subscription ones go in as free, rent/buy ones go
+          in marked "paid" (TMDb tells us the provider, not the exact rental price, so you can fill that in
+          yourself if you want it).
+        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-400">Services you have (comma separated)</span>
+            <input
+              value={servicesDraft}
+              onChange={(e) => {
+                setServicesDraft(e.target.value)
+                setPrefsSaved(false)
+              }}
+              placeholder="Netflix, Max, Amazon Prime Video"
+              className="rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-400">Region (ISO country code)</span>
+            <input
+              value={regionDraft}
+              onChange={(e) => {
+                setRegionDraft(e.target.value)
+                setPrefsSaved(false)
+              }}
+              placeholder="US"
+              className="w-24 rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setServices(parseTagList(servicesDraft))
+              setRegion(regionDraft)
+              setPrefsSaved(true)
+            }}
+            className="self-start rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
+          >
+            Save
+          </button>
+        </div>
+        {prefsSaved ? <p className="mt-1 text-xs text-emerald-400">Saved.</p> : null}
       </div>
 
       <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4 text-sm text-slate-400">

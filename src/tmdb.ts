@@ -75,3 +75,38 @@ export async function getDetails(apiKey: string, id: number, kind: MovieKind): P
     posterUrl: data.poster_path ? `${POSTER_BASE}${data.poster_path}` : undefined,
   }
 }
+
+export type TmdbProviderCategory = 'flatrate' | 'free' | 'ads' | 'rent' | 'buy'
+
+export interface TmdbProvider {
+  name: string
+  category: TmdbProviderCategory
+}
+
+/**
+ * TMDb's watch/providers endpoint (JustWatch-sourced) lists which services carry a title
+ * per region, and under what access type — it does NOT include actual rental/purchase
+ * prices, just the provider name and category.
+ */
+export async function getWatchProviders(
+  apiKey: string,
+  id: number,
+  kind: MovieKind,
+  region: string,
+): Promise<TmdbProvider[]> {
+  const path = kind === 'movie' ? `/movie/${id}/watch/providers` : `/tv/${id}/watch/providers`
+  const data = (await tmdbFetch(path, apiKey)) as {
+    results: Record<string, Partial<Record<TmdbProviderCategory, { provider_name: string }[]>>>
+  }
+  const regionData = data.results[region.toUpperCase()]
+  if (!regionData) return []
+
+  const categories: TmdbProviderCategory[] = ['flatrate', 'free', 'ads', 'rent', 'buy']
+  const providers: TmdbProvider[] = []
+  for (const category of categories) {
+    for (const p of regionData[category] ?? []) {
+      providers.push({ name: p.provider_name, category })
+    }
+  }
+  return providers
+}

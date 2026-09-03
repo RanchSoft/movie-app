@@ -9,6 +9,8 @@ export interface StreamingAvailability {
   service: string
   /** USD. Omitted/undefined means free (included with a subscription you already have). */
   price?: number
+  /** True = known to require rental/purchase but the exact price isn't known (e.g. from TMDb's watch-providers data, which lists providers, not prices). Ignored once `price` is set. */
+  paid?: boolean
 }
 
 export interface Availability {

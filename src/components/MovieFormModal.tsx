@@ -4,8 +4,25 @@ import type { Movie, MovieKind, MovieStats, PhysicalCopy, PhysicalFormat, Stream
 import { parseTagList, formatDate } from '../utils/format'
 import { computeRating, RATING_SOURCES } from '../ratingSources'
 import { useTmdbKey } from '../store/useTmdbKey'
-import { search as tmdbSearch, getDetails as getTmdbDetails } from '../tmdb'
-import type { TmdbSearchResult } from '../tmdb'
+import { useStreamingPrefs } from '../store/useStreamingPrefs'
+import { search as tmdbSearch, getDetails as getTmdbDetails, getWatchProviders } from '../tmdb'
+import type { TmdbSearchResult, TmdbProvider } from '../tmdb'
+
+const FREE_CATEGORIES = new Set<TmdbProvider['category']>(['flatrate', 'free', 'ads'])
+
+/** Matches TMDb's provider list against the services you told us you have, deduped and preferring a free/subscription match over a paid one for the same service. */
+function matchProviders(providers: TmdbProvider[], myServices: string[]): { service: string; paid: boolean }[] {
+  const mine = new Set(myServices.map((s) => s.toLowerCase()))
+  const bestByService = new Map<string, boolean>() // service (lowercased) -> paid?
+  for (const p of providers) {
+    if (!mine.has(p.name.toLowerCase())) continue
+    const paid = !FREE_CATEGORIES.has(p.category)
+    const existing = bestByService.get(p.name.toLowerCase())
+    if (existing === undefined || (existing && !paid)) bestByService.set(p.name.toLowerCase(), paid)
+  }
+  const byLower = new Map(providers.map((p) => [p.name.toLowerCase(), p.name]))
+  return Array.from(bestByService.entries()).map(([lower, paid]) => ({ service: byLower.get(lower) ?? lower, paid }))
+}
 
 const PHYSICAL_FORMATS: PhysicalFormat[] = ['DVD', 'Blu-ray', '4K UHD', 'VHS', 'Digital Copy']
 
@@ -20,6 +37,7 @@ interface Props {
 
 export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelete, onClose }: Props) {
   const { apiKey } = useTmdbKey()
+  const { services: myServices, region } = useStreamingPrefs()
   const [kind, setKind] = useState<MovieKind>(initial?.kind ?? 'movie')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [year, setYear] = useState(initial?.year?.toString() ?? '')
@@ -39,6 +57,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
   const [tmdbResults, setTmdbResults] = useState<TmdbSearchResult[] | null>(null)
   const [tmdbBusy, setTmdbBusy] = useState<'search' | 'details' | null>(null)
   const [tmdbError, setTmdbError] = useState<string | null>(null)
+  const [providerNote, setProviderNote] = useState<string | null>(null)
 
   const addPhysicalCopy = () => setPhysical((p) => [...p, { format: 'Blu-ray' }])
   const updatePhysicalCopy = (idx: number, updates: Partial<PhysicalCopy>) =>
@@ -83,6 +102,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
     if (!apiKey) return
     setTmdbBusy('details')
     setTmdbError(null)
+    setProviderNote(null)
     try {
       const details = await getTmdbDetails(apiKey, result.id, kind)
       setTitle(details.title)
@@ -92,6 +112,27 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
       if (details.posterUrl) setPosterUrl(details.posterUrl)
       setTmdbResults(null)
       setTmdbQuery('')
+
+      if (myServices.length > 0) {
+        try {
+          const providers = await getWatchProviders(apiKey, result.id, kind, region)
+          const matches = matchProviders(providers, myServices)
+          setStreaming((prev) => {
+            const already = new Set(prev.map((s) => s.service.trim().toLowerCase()))
+            const additions = matches
+              .filter((m) => !already.has(m.service.toLowerCase()))
+              .map((m) => ({ service: m.service, paid: m.paid || undefined }))
+            return [...prev, ...additions]
+          })
+          setProviderNote(
+            matches.length > 0
+              ? `Added ${matches.length} streaming option${matches.length === 1 ? '' : 's'} from your services.`
+              : `None of your services carry this in ${region}.`,
+          )
+        } catch (err) {
+          setProviderNote(`Couldn't check streaming providers: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
     } catch (err) {
       setTmdbError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -115,7 +156,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
         physical,
         streaming: streaming
           .filter((s) => s.service.trim())
-          .map((s) => ({ service: s.service.trim(), price: s.price })),
+          .map((s) => ({ service: s.service.trim(), price: s.price, paid: s.price ? undefined : s.paid })),
       },
     })
   }
@@ -188,6 +229,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
               </button>
             </div>
             {tmdbError ? <p className="mt-2 text-xs text-red-400">{tmdbError}</p> : null}
+        {providerNote ? <p className="mt-2 text-xs text-slate-400">{providerNote}</p> : null}
             {tmdbResults ? (
               tmdbResults.length === 0 ? (
                 <p className="mt-2 text-xs text-slate-500">No results.</p>
@@ -325,9 +367,12 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
                   <input
                     value={entry.price?.toString() ?? ''}
                     onChange={(e) =>
-                      updateStreaming(idx, { price: e.target.value ? Number(e.target.value) : undefined })
+                      updateStreaming(idx, {
+                        price: e.target.value ? Number(e.target.value) : undefined,
+                        paid: e.target.value ? undefined : entry.paid,
+                      })
                     }
-                    placeholder="Free"
+                    placeholder={entry.paid ? 'Paid, $?' : 'Free'}
                     inputMode="decimal"
                     className={`${inputCls} w-24`}
                   />

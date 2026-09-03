@@ -27,8 +27,17 @@ On your phone: open that URL once in Chrome, then **⋮ → Add to Home screen**
 
 ## Data model
 
-- **Movie**: title, year, genres, runtime, poster URL, notes, physical copies (format + shelf location), streaming services, and rating sources.
+- **Movie** (also covers TV shows, via `kind`): title, year, genres, tags, runtime, poster URL, notes, physical copies (format + shelf location), streaming services (with an optional price — see below), and rating sources.
 - **Rating**: not entered directly — computed from whichever rating sources you provide (currently Letterboxd 0-5, Rotten Tomatoes critic score 0-100), each normalized to a 0-5 scale and averaged equally. See `src/ratingSources.ts` to add more sources.
 - **Watch session**: date, shortlist considered, movie picked, pick method (random/manual), attendees, notes. Logged permanently and used to derive "times watched," "last watched," and "appears in N lists" for filtering/sorting the library.
+
+## TMDb integration (optional, Settings)
+
+Adding a free API key from [themoviedb.org](https://www.themoviedb.org/settings/api) enables, in the Add/Edit movie form:
+
+- **Search & autofill** — title, year, genres, runtime, and poster from a selected TMDb result.
+- **Streaming availability autofill** — once you've also listed which services you have in Settings ("Your streaming services" + a region code), selecting a TMDb search result also checks that title's watch-provider data and fills in matching services automatically: subscription/ad-supported access goes in free, rent/buy access goes in marked `paid` (TMDb's data tells you *which* provider carries a rent/buy option, not the actual price — fill that in yourself if you want an exact number).
+
+The API key and your service/region preferences all live only in this browser's `localStorage` — never committed to the repo or included in the built site.
 
 For hand-written entries, only `title` is required — `id`, `addedAt`, and array fields are filled in automatically on import.

@@ -12,7 +12,8 @@ function normalizeStreamingEntry(raw: unknown): StreamingAvailability | null {
     if (!service) return null
     const rawPrice = (raw as { price?: unknown }).price
     const price = typeof rawPrice === 'number' && Number.isFinite(rawPrice) ? rawPrice : undefined
-    return { service, price }
+    const paid = (raw as { paid?: unknown }).paid === true ? true : undefined
+    return { service, price, paid }
   }
   return null
 }
