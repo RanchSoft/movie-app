@@ -4,14 +4,16 @@ import { useShortlist } from './store/useShortlist'
 import { LibraryView } from './components/LibraryView'
 import { ShortlistView } from './components/ShortlistView'
 import { HistoryView } from './components/HistoryView'
+import { StatsView } from './components/StatsView'
 import { SettingsView } from './components/SettingsView'
 
-type Tab = 'library' | 'shortlist' | 'history' | 'settings'
+type Tab = 'library' | 'shortlist' | 'history' | 'stats' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'library', label: 'Library', icon: '🎬' },
   { id: 'shortlist', label: 'Shortlist', icon: '📋' },
   { id: 'history', label: 'History', icon: '🕓' },
+  { id: 'stats', label: 'Stats', icon: '📊' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
 
@@ -25,6 +27,7 @@ function AppShell() {
         {tab === 'library' ? <LibraryView shortlist={shortlist} onToggleShortlist={toggle} /> : null}
         {tab === 'shortlist' ? <ShortlistView shortlist={shortlist} onRemove={remove} onClear={clear} /> : null}
         {tab === 'history' ? <HistoryView onAddToShortlist={addMany} /> : null}
+        {tab === 'stats' ? <StatsView /> : null}
         {tab === 'settings' ? <SettingsView /> : null}
       </main>
 

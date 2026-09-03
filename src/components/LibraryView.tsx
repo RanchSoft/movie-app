@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useLibrary } from '../store/LibraryContext'
+import { useLibraryFilters } from '../store/useLibraryFilters'
 import type { Movie } from '../types'
 import { MovieCard } from './MovieCard'
-import { DEFAULT_FILTERS, FilterBar } from './FilterBar'
-import type { Filters } from './FilterBar'
+import { FilterBar } from './FilterBar'
 import { MovieFormModal } from './MovieFormModal'
 import { RandomPickModal } from './RandomPickModal'
 import { computeRating } from '../ratingSources'
 import { isFreeToWatch } from '../utils/availability'
+import { todayIso } from '../utils/format'
 
 interface Props {
   shortlist: string[]
@@ -15,10 +16,21 @@ interface Props {
 }
 
 export function LibraryView({ shortlist, onToggleShortlist }: Props) {
-  const { movies, addMovie, updateMovie, deleteMovie, statsFor } = useLibrary()
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
+  const { movies, addMovie, updateMovie, deleteMovie, addSession, statsFor } = useLibrary()
+  const [filters, setFilters] = useLibraryFilters()
   const [editingMovie, setEditingMovie] = useState<Movie | null | 'new'>(null)
   const [randomPickId, setRandomPickId] = useState<string | null>(null)
+
+  const markWatched = (movieId: string) => {
+    addSession({
+      date: todayIso(),
+      shortlistMovieIds: [movieId],
+      pickedMovieId: movieId,
+      pickMethod: 'manual',
+      attendees: [],
+      notes: undefined,
+    })
+  }
 
   const genres = useMemo(
     () => Array.from(new Set(movies.flatMap((m) => m.genres))).sort(),
@@ -133,6 +145,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
               stats={statsFor(movie.id)}
               inShortlist={shortlist.includes(movie.id)}
               onToggleShortlist={() => onToggleShortlist(movie.id)}
+              onMarkWatched={() => markWatched(movie.id)}
               onEdit={() => setEditingMovie(movie)}
             />
           ))}
@@ -145,6 +158,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
           initial={editingInitial}
           stats={editingInitial ? statsFor(editingInitial.id) : null}
           existingMovies={movies}
+          onMarkWatched={editingInitial ? () => markWatched(editingInitial.id) : undefined}
           onClose={() => setEditingMovie(null)}
           onSave={(data) => {
             if (editingInitial) {

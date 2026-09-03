@@ -8,10 +8,11 @@ interface Props {
   stats: MovieStats
   inShortlist: boolean
   onToggleShortlist: () => void
+  onMarkWatched: () => void
   onEdit: () => void
 }
 
-export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onEdit }: Props) {
+export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onMarkWatched, onEdit }: Props) {
   const rating = computeRating(movie.ratingSources)
   const free = isFreeToWatch(movie)
   // Considered often but rarely actually picked — worth surfacing.
@@ -65,17 +66,27 @@ export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onEdit
             Shortlisted {stats.timesShortlisted}×
           </div>
         ) : null}
-        <button
-          type="button"
-          onClick={onToggleShortlist}
-          className={`mt-2 rounded px-2 py-1.5 text-xs font-medium transition ${
-            inShortlist
-              ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-              : 'bg-slate-700 text-slate-100 hover:bg-slate-600'
-          }`}
-        >
-          {inShortlist ? 'In shortlist ✓' : 'Add to shortlist'}
-        </button>
+        <div className="mt-2 flex gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleShortlist}
+            className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
+              inShortlist
+                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                : 'bg-slate-700 text-slate-100 hover:bg-slate-600'
+            }`}
+          >
+            {inShortlist ? 'In shortlist ✓' : 'Add to shortlist'}
+          </button>
+          <button
+            type="button"
+            onClick={onMarkWatched}
+            title="Mark watched today"
+            className="rounded bg-slate-700 px-2 py-1.5 text-xs font-medium text-slate-100 hover:bg-emerald-700"
+          >
+            ✓
+          </button>
+        </div>
       </div>
     </div>
   )

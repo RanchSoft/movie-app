@@ -32,10 +32,11 @@ interface Props {
   existingMovies: Movie[]
   onSave: (movie: Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>) => void
   onDelete?: () => void
+  onMarkWatched?: () => void
   onClose: () => void
 }
 
-export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelete, onClose }: Props) {
+export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelete, onMarkWatched, onClose }: Props) {
   const { apiKey } = useTmdbKey()
   const { services: myServices, region } = useStreamingPrefs()
   const [kind, setKind] = useState<MovieKind>(initial?.kind ?? 'movie')
@@ -202,6 +203,16 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
             Watched {stats.timesWatched}× · Shortlisted {stats.timesShortlisted}×
             {stats.lastWatchedDate ? ` · Last watched ${formatDate(stats.lastWatchedDate)}` : ''}
           </div>
+        ) : null}
+
+        {onMarkWatched ? (
+          <button
+            type="button"
+            onClick={onMarkWatched}
+            className="mb-3 rounded bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+          >
+            ✓ Mark watched today
+          </button>
         ) : null}
 
         {apiKey ? (
