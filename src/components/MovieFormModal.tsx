@@ -229,7 +229,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
               </button>
             </div>
             {tmdbError ? <p className="mt-2 text-xs text-red-400">{tmdbError}</p> : null}
-        {providerNote ? <p className="mt-2 text-xs text-slate-400">{providerNote}</p> : null}
+            {providerNote ? <p className="mt-2 text-xs text-slate-400">{providerNote}</p> : null}
             {tmdbResults ? (
               tmdbResults.length === 0 ? (
                 <p className="mt-2 text-xs text-slate-500">No results.</p>
@@ -254,6 +254,18 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
                 </div>
               )
             ) : null}
+            <p className="mt-2 text-[11px] text-slate-500">
+              Streaming availability data provided by{' '}
+              <a
+                href="https://www.justwatch.com"
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-slate-300"
+              >
+                JustWatch
+              </a>
+              .
+            </p>
           </div>
         ) : (
           <p className="mb-3 text-xs text-slate-500">Add a TMDb API key in Settings to search and autofill.</p>

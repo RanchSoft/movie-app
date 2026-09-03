@@ -118,6 +118,21 @@ export function ProviderPicker({ apiKey, region, selected, onChange }: Props) {
         <p className="text-xs text-slate-500">Add a TMDb API key above to pick from the official provider list.</p>
       )}
 
+      {apiKey ? (
+        <p className="text-[11px] text-slate-500">
+          Provider list data provided by{' '}
+          <a
+            href="https://www.justwatch.com"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-300"
+          >
+            JustWatch
+          </a>
+          .
+        </p>
+      ) : null}
+
       <div className="flex gap-2">
         <input
           value={customDraft}
