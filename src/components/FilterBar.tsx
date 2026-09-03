@@ -4,6 +4,8 @@ export interface Filters {
   genre: string
   tag: string
   maxRuntime: number | null
+  minRating: number | null
+  maxRating: number | null
   availability: 'all' | 'physical' | 'streaming' | 'free'
   watched: 'all' | 'watched' | 'unwatched'
   sort: 'title' | 'rating' | 'timesWatched' | 'lastWatched' | 'timesShortlisted' | 'year' | 'updatedAt'
@@ -15,6 +17,8 @@ export const DEFAULT_FILTERS: Filters = {
   genre: 'all',
   tag: 'all',
   maxRuntime: null,
+  minRating: null,
+  maxRating: null,
   availability: 'all',
   watched: 'all',
   sort: 'title',
@@ -103,6 +107,30 @@ export function FilterBar({ filters, onChange, genres, tags }: Props) {
           <option value="120">Under 2h</option>
           <option value="150">Under 2.5h</option>
         </select>
+        <div className="flex items-center gap-1 rounded border border-slate-600 bg-slate-900 px-2 py-1.5">
+          <span className="text-sm text-slate-400">★</span>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            step={0.5}
+            placeholder="Min"
+            value={filters.minRating ?? ''}
+            onChange={(e) => set('minRating', e.target.value ? Number(e.target.value) : null)}
+            className="w-12 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+          />
+          <span className="text-slate-500">–</span>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            step={0.5}
+            placeholder="Max"
+            value={filters.maxRating ?? ''}
+            onChange={(e) => set('maxRating', e.target.value ? Number(e.target.value) : null)}
+            className="w-12 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+          />
+        </div>
         <select
           value={filters.sort}
           onChange={(e) => set('sort', e.target.value as Filters['sort'])}

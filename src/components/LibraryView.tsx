@@ -39,6 +39,12 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
       if (filters.availability === 'physical' && m.availability.physical.length === 0) return false
       if (filters.availability === 'streaming' && m.availability.streaming.length === 0) return false
       if (filters.availability === 'free' && !isFreeToWatch(m)) return false
+      if (filters.minRating !== null || filters.maxRating !== null) {
+        const rating = computeRating(m.ratingSources)
+        if (rating === null) return false
+        if (filters.minRating !== null && rating < filters.minRating) return false
+        if (filters.maxRating !== null && rating > filters.maxRating) return false
+      }
       const stats = statsFor(m.id)
       if (filters.watched === 'watched' && stats.timesWatched === 0) return false
       if (filters.watched === 'unwatched' && stats.timesWatched > 0) return false
