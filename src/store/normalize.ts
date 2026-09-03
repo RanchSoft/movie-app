@@ -1,0 +1,40 @@
+import { nanoid } from 'nanoid'
+import type { Movie, WatchSession } from '../types'
+
+/**
+ * Fills in whatever a hand-written movie entry leaves out (id, addedAt, arrays)
+ * so a JSON file only needs a `title` to be valid. Existing ids are preserved
+ * as-is since watch sessions reference movies by id.
+ */
+export function normalizeMovie(raw: Partial<Movie>): Movie {
+  if (!raw.title || typeof raw.title !== 'string') {
+    throw new Error('Every movie needs a "title".')
+  }
+  return {
+    id: raw.id && typeof raw.id === 'string' ? raw.id : nanoid(),
+    title: raw.title,
+    year: raw.year,
+    genres: Array.isArray(raw.genres) ? raw.genres : [],
+    runtimeMinutes: raw.runtimeMinutes,
+    ratingSources: raw.ratingSources && typeof raw.ratingSources === 'object' ? raw.ratingSources : {},
+    posterUrl: raw.posterUrl,
+    notes: raw.notes,
+    availability: {
+      physical: Array.isArray(raw.availability?.physical) ? raw.availability.physical : [],
+      streaming: Array.isArray(raw.availability?.streaming) ? raw.availability.streaming : [],
+    },
+    addedAt: raw.addedAt && typeof raw.addedAt === 'string' ? raw.addedAt : new Date().toISOString(),
+  }
+}
+
+export function normalizeSession(raw: Partial<WatchSession>): WatchSession {
+  return {
+    id: raw.id && typeof raw.id === 'string' ? raw.id : nanoid(),
+    date: raw.date && typeof raw.date === 'string' ? raw.date : new Date().toISOString().slice(0, 10),
+    shortlistMovieIds: Array.isArray(raw.shortlistMovieIds) ? raw.shortlistMovieIds : [],
+    pickedMovieId: raw.pickedMovieId ?? null,
+    pickMethod: raw.pickMethod ?? null,
+    attendees: Array.isArray(raw.attendees) ? raw.attendees : [],
+    notes: raw.notes,
+  }
+}
