@@ -2,6 +2,7 @@ import type { MovieKind } from './types'
 
 const API_BASE = 'https://api.themoviedb.org/3'
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w342'
+const LOGO_BASE = 'https://image.tmdb.org/t/p/w45'
 
 export interface TmdbSearchResult {
   id: number
@@ -109,4 +110,39 @@ export async function getWatchProviders(
     }
   }
   return providers
+}
+
+export interface TmdbProviderListing {
+  name: string
+  logoUrl?: string
+  /** Lower is more prominent in this region — used to sort the picker so the big names show first. */
+  priority: number
+}
+
+/**
+ * The full catalog of providers TMDb knows about for this region, for picking "which services
+ * do you have" from an authoritative list instead of typing names that might not match exactly.
+ * Movie and TV provider lists overlap heavily but aren't identical, so both are fetched and merged.
+ */
+export async function getAllProviders(apiKey: string, region: string): Promise<TmdbProviderListing[]> {
+  const regionUpper = region.toUpperCase()
+  const fetchOne = async (kind: MovieKind) => {
+    const path = kind === 'movie' ? '/watch/providers/movie' : '/watch/providers/tv'
+    const data = (await tmdbFetch(`${path}?watch_region=${regionUpper}`, apiKey)) as {
+      results: { provider_name: string; logo_path?: string | null; display_priorities?: Record<string, number> }[]
+    }
+    return data.results.map((p) => ({
+      name: p.provider_name,
+      logoUrl: p.logo_path ? `${LOGO_BASE}${p.logo_path}` : undefined,
+      priority: p.display_priorities?.[regionUpper] ?? 999,
+    }))
+  }
+
+  const [movieProviders, tvProviders] = await Promise.all([fetchOne('movie'), fetchOne('tv')])
+  const byName = new Map<string, TmdbProviderListing>()
+  for (const p of [...movieProviders, ...tvProviders]) {
+    const existing = byName.get(p.name)
+    if (!existing || p.priority < existing.priority) byName.set(p.name, p)
+  }
+  return Array.from(byName.values()).sort((a, b) => a.priority - b.priority)
 }
