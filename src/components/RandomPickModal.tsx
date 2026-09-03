@@ -43,6 +43,7 @@ export function RandomPickModal({ movie, stats, poolSize, inShortlist, onReroll,
           </div>
           <div className="flex flex-1 flex-col gap-1">
             <button type="button" onClick={onEdit} className="text-left text-lg font-bold text-slate-100 hover:underline">
+              {movie.kind === 'tv' ? '📺 ' : null}
               {movie.title}
             </button>
             <p className="text-sm text-slate-400">{movie.year ?? ''}</p>

@@ -1,5 +1,6 @@
 export interface Filters {
   query: string
+  kind: 'all' | 'movie' | 'tv'
   genre: string
   tag: string
   maxRuntime: number | null
@@ -10,6 +11,7 @@ export interface Filters {
 
 export const DEFAULT_FILTERS: Filters = {
   query: '',
+  kind: 'all',
   genre: 'all',
   tag: 'all',
   maxRuntime: null,
@@ -39,6 +41,15 @@ export function FilterBar({ filters, onChange, genres, tags }: Props) {
         className="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
       />
       <div className="flex flex-wrap gap-2">
+        <select
+          value={filters.kind}
+          onChange={(e) => set('kind', e.target.value as Filters['kind'])}
+          className="rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+        >
+          <option value="all">Movies & TV</option>
+          <option value="movie">Movies only</option>
+          <option value="tv">TV shows only</option>
+        </select>
         <select
           value={filters.genre}
           onChange={(e) => set('genre', e.target.value)}

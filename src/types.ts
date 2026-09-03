@@ -16,8 +16,12 @@ export interface Availability {
   streaming: StreamingAvailability[]
 }
 
+export type MovieKind = 'movie' | 'tv'
+
+/** Despite the name, this also covers TV shows (see `kind`) — no episode-level tracking, a show is just a library entry like a movie. */
 export interface Movie {
   id: string
+  kind: MovieKind
   title: string
   year?: number
   genres: string[]

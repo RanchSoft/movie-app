@@ -32,6 +32,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
     const q = filters.query.trim().toLowerCase()
     let result = movies.filter((m) => {
       if (q && !m.title.toLowerCase().includes(q)) return false
+      if (filters.kind !== 'all' && m.kind !== filters.kind) return false
       if (filters.genre !== 'all' && !m.genres.includes(filters.genre)) return false
       if (filters.tag !== 'all' && !m.tags.includes(filters.tag)) return false
       if (filters.maxRuntime && (m.runtimeMinutes ?? Infinity) > filters.maxRuntime) return false
@@ -94,7 +95,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
           onClick={() => setEditingMovie('new')}
           className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
         >
-          + Add movie
+          + Add title
         </button>
       </div>
 
@@ -102,13 +103,13 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
 
       {filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">
-          {movies.length === 0 ? 'No movies yet — add your first one.' : 'No movies match these filters.'}
+          {movies.length === 0 ? 'Nothing here yet — add your first movie or show.' : 'Nothing matches these filters.'}
         </p>
       ) : (
         <>
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-400">
-              {filtered.length} movie{filtered.length === 1 ? '' : 's'} match
+              {filtered.length} title{filtered.length === 1 ? '' : 's'} match
             </p>
             <button
               type="button"

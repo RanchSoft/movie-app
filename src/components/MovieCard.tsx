@@ -21,8 +21,13 @@ export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onEdit
       <button
         type="button"
         onClick={onEdit}
-        className="flex aspect-[2/3] w-full items-center justify-center overflow-hidden bg-slate-900 text-left"
+        className="relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden bg-slate-900 text-left"
       >
+        {movie.kind === 'tv' ? (
+          <span className="absolute left-1.5 top-1.5 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-200">
+            📺 TV
+          </span>
+        ) : null}
         {movie.posterUrl ? (
           <img src={movie.posterUrl} alt={movie.title} className="h-full w-full object-cover" />
         ) : (

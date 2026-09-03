@@ -29,6 +29,7 @@ export function normalizeMovie(raw: Partial<Movie>): Movie {
   const addedAt = raw.addedAt && typeof raw.addedAt === 'string' ? raw.addedAt : new Date().toISOString()
   return {
     id: raw.id && typeof raw.id === 'string' ? raw.id : nanoid(),
+    kind: raw.kind === 'tv' ? 'tv' : 'movie',
     title: raw.title,
     year: raw.year,
     genres: Array.isArray(raw.genres) ? raw.genres : [],
