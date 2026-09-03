@@ -3,21 +3,27 @@ import type { ReactNode } from 'react'
 import type { Movie, MovieStats, PhysicalCopy, PhysicalFormat, StreamingAvailability } from '../types'
 import { parseTagList, formatDate } from '../utils/format'
 import { computeRating, RATING_SOURCES } from '../ratingSources'
+import { useTmdbKey } from '../store/useTmdbKey'
+import { searchMovies, getMovieDetails } from '../tmdb'
+import type { TmdbSearchResult } from '../tmdb'
 
 const PHYSICAL_FORMATS: PhysicalFormat[] = ['DVD', 'Blu-ray', '4K UHD', 'VHS', 'Digital Copy']
 
 interface Props {
   initial: Movie | null
   stats: MovieStats | null
+  existingMovies: Movie[]
   onSave: (movie: Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>) => void
   onDelete?: () => void
   onClose: () => void
 }
 
-export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Props) {
+export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelete, onClose }: Props) {
+  const { apiKey } = useTmdbKey()
   const [title, setTitle] = useState(initial?.title ?? '')
   const [year, setYear] = useState(initial?.year?.toString() ?? '')
   const [genres, setGenres] = useState(initial?.genres.join(', ') ?? '')
+  const [tags, setTags] = useState(initial?.tags.join(', ') ?? '')
   const [runtime, setRuntime] = useState(initial?.runtimeMinutes?.toString() ?? '')
   const [ratingInputs, setRatingInputs] = useState<Record<string, string>>(() => {
     const entries = RATING_SOURCES.map((def) => [def.id, initial?.ratingSources[def.id]?.toString() ?? ''])
@@ -27,6 +33,11 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [streaming, setStreaming] = useState<StreamingAvailability[]>(initial?.availability.streaming ?? [])
   const [physical, setPhysical] = useState<PhysicalCopy[]>(initial?.availability.physical ?? [])
+
+  const [tmdbQuery, setTmdbQuery] = useState('')
+  const [tmdbResults, setTmdbResults] = useState<TmdbSearchResult[] | null>(null)
+  const [tmdbBusy, setTmdbBusy] = useState<'search' | 'details' | null>(null)
+  const [tmdbError, setTmdbError] = useState<string | null>(null)
 
   const addPhysicalCopy = () => setPhysical((p) => [...p, { format: 'Blu-ray' }])
   const updatePhysicalCopy = (idx: number, updates: Partial<PhysicalCopy>) =>
@@ -47,12 +58,53 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
   )
   const previewRating = computeRating(ratingSources)
 
+  const duplicate = existingMovies.find(
+    (m) =>
+      m.id !== initial?.id &&
+      m.title.trim().toLowerCase() === title.trim().toLowerCase() &&
+      (m.year ?? null) === (year ? Number(year) : null),
+  )
+
+  const runTmdbSearch = async () => {
+    if (!apiKey || !tmdbQuery.trim()) return
+    setTmdbBusy('search')
+    setTmdbError(null)
+    try {
+      setTmdbResults(await searchMovies(apiKey, tmdbQuery.trim()))
+    } catch (err) {
+      setTmdbError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setTmdbBusy(null)
+    }
+  }
+
+  const applyTmdbResult = async (result: TmdbSearchResult) => {
+    if (!apiKey) return
+    setTmdbBusy('details')
+    setTmdbError(null)
+    try {
+      const details = await getMovieDetails(apiKey, result.id)
+      setTitle(details.title)
+      if (details.year) setYear(details.year.toString())
+      if (details.genres.length > 0) setGenres(details.genres.join(', '))
+      if (details.runtimeMinutes) setRuntime(details.runtimeMinutes.toString())
+      if (details.posterUrl) setPosterUrl(details.posterUrl)
+      setTmdbResults(null)
+      setTmdbQuery('')
+    } catch (err) {
+      setTmdbError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setTmdbBusy(null)
+    }
+  }
+
   const handleSave = () => {
     if (!canSave) return
     onSave({
       title: title.trim(),
       year: year ? Number(year) : undefined,
       genres: parseTagList(genres),
+      tags: parseTagList(tags),
       runtimeMinutes: runtime ? Number(runtime) : undefined,
       ratingSources,
       posterUrl: posterUrl.trim() || undefined,
@@ -88,10 +140,69 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
           </div>
         ) : null}
 
+        {apiKey ? (
+          <div className="mb-3 rounded border border-slate-700 bg-slate-800/60 p-2">
+            <div className="flex gap-2">
+              <input
+                value={tmdbQuery}
+                onChange={(e) => setTmdbQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    runTmdbSearch()
+                  }
+                }}
+                placeholder="Search TMDb to autofill..."
+                className={`${inputCls} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={runTmdbSearch}
+                disabled={tmdbBusy !== null || !tmdbQuery.trim()}
+                className="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-100 hover:bg-slate-600 disabled:opacity-40"
+              >
+                {tmdbBusy === 'search' ? '…' : 'Search'}
+              </button>
+            </div>
+            {tmdbError ? <p className="mt-2 text-xs text-red-400">{tmdbError}</p> : null}
+            {tmdbResults ? (
+              tmdbResults.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500">No results.</p>
+              ) : (
+                <div className="mt-2 flex max-h-56 flex-col gap-1 overflow-y-auto">
+                  {tmdbResults.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      disabled={tmdbBusy !== null}
+                      onClick={() => applyTmdbResult(r)}
+                      className="flex items-center gap-2 rounded px-1 py-1 text-left text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+                    >
+                      <span className="flex h-12 w-8 flex-none items-center justify-center overflow-hidden rounded bg-slate-900 text-[10px] text-slate-500">
+                        {r.posterUrl ? <img src={r.posterUrl} alt="" className="h-full w-full object-cover" /> : '—'}
+                      </span>
+                      <span>
+                        {r.title} {r.year ? <span className="text-slate-400">({r.year})</span> : null}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : null}
+          </div>
+        ) : (
+          <p className="mb-3 text-xs text-slate-500">Add a TMDb API key in Settings to search and autofill.</p>
+        )}
+
         <div className="flex flex-col gap-3">
           <Field label="Title *">
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
           </Field>
+          {duplicate ? (
+            <p className="-mt-2 text-xs text-amber-400">
+              ⚠ You already have "{duplicate.title}" {duplicate.year ? `(${duplicate.year})` : ''} in your library.
+            </p>
+          ) : null}
           <div className="flex gap-3">
             <Field label="Year" className="w-24">
               <input value={year} onChange={(e) => setYear(e.target.value)} className={inputCls} inputMode="numeric" />
@@ -102,6 +213,14 @@ export function MovieFormModal({ initial, stats, onSave, onDelete, onClose }: Pr
           </div>
           <Field label="Genres (comma separated)">
             <input value={genres} onChange={(e) => setGenres(e.target.value)} className={inputCls} placeholder="Action, Comedy" />
+          </Field>
+          <Field label="Tags (comma separated)">
+            <input
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className={inputCls}
+              placeholder="Date night, background noise"
+            />
           </Field>
 
           <div>

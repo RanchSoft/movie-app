@@ -21,6 +21,8 @@ export interface Movie {
   title: string
   year?: number
   genres: string[]
+  /** Free-form, e.g. "date night", "background noise" — separate from genre. */
+  tags: string[]
   runtimeMinutes?: number
   ratingSources: Partial<Record<string, number>>
   posterUrl?: string

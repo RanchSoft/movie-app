@@ -24,11 +24,16 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
     () => Array.from(new Set(movies.flatMap((m) => m.genres))).sort(),
     [movies],
   )
+  const tags = useMemo(
+    () => Array.from(new Set(movies.flatMap((m) => m.tags))).sort(),
+    [movies],
+  )
   const filtered = useMemo(() => {
     const q = filters.query.trim().toLowerCase()
     let result = movies.filter((m) => {
       if (q && !m.title.toLowerCase().includes(q)) return false
       if (filters.genre !== 'all' && !m.genres.includes(filters.genre)) return false
+      if (filters.tag !== 'all' && !m.tags.includes(filters.tag)) return false
       if (filters.maxRuntime && (m.runtimeMinutes ?? Infinity) > filters.maxRuntime) return false
       if (filters.availability === 'physical' && m.availability.physical.length === 0) return false
       if (filters.availability === 'streaming' && m.availability.streaming.length === 0) return false
@@ -93,7 +98,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
         </button>
       </div>
 
-      <FilterBar filters={filters} onChange={setFilters} genres={genres} />
+      <FilterBar filters={filters} onChange={setFilters} genres={genres} tags={tags} />
 
       {filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">
@@ -132,6 +137,7 @@ export function LibraryView({ shortlist, onToggleShortlist }: Props) {
         <MovieFormModal
           initial={editingInitial}
           stats={editingInitial ? statsFor(editingInitial.id) : null}
+          existingMovies={movies}
           onClose={() => setEditingMovie(null)}
           onSave={(data) => {
             if (editingInitial) {

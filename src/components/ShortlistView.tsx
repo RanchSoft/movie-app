@@ -15,6 +15,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
   const [attendees, setAttendees] = useState('')
   const [notes, setNotes] = useState('')
   const [rolling, setRolling] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const shortlistMovies = shortlist
     .map((id) => movies.find((m) => m.id === id))
@@ -59,14 +60,31 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
 
   const pickedMovie = pickedId ? movies.find((m) => m.id === pickedId) : null
 
+  const copyShortlist = async () => {
+    const lines = shortlistMovies.map((m) => `- ${m.title}${m.year ? ` (${m.year})` : ''}`)
+    const text = `Tonight's shortlist:\n${lines.join('\n')}`
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      alert(text)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-100">Tonight's shortlist ({shortlistMovies.length})</h1>
         {shortlistMovies.length > 0 ? (
-          <button type="button" onClick={onClear} className="text-sm text-slate-400 hover:text-red-400">
-            Clear all
-          </button>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={copyShortlist} className="text-sm text-slate-400 hover:text-slate-200">
+              {copied ? 'Copied ✓' : '📋 Copy list'}
+            </button>
+            <button type="button" onClick={onClear} className="text-sm text-slate-400 hover:text-red-400">
+              Clear all
+            </button>
+          </div>
         ) : null}
       </div>
 

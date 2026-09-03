@@ -52,6 +52,11 @@ export function RandomPickModal({ movie, stats, poolSize, inShortlist, onReroll,
                   {g}
                 </span>
               ))}
+              {movie.tags.map((t) => (
+                <span key={t} className="rounded border border-slate-600 px-1.5 py-0.5 text-xs text-slate-400">
+                  {t}
+                </span>
+              ))}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
               <span>{formatRuntime(movie.runtimeMinutes)}</span>

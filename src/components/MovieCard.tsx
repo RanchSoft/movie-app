@@ -39,6 +39,11 @@ export function MovieCard({ movie, stats, inShortlist, onToggleShortlist, onEdit
               {g}
             </span>
           ))}
+          {movie.tags.slice(0, 2).map((t) => (
+            <span key={t} className="rounded border border-slate-600 px-1.5 py-0.5">
+              {t}
+            </span>
+          ))}
         </div>
         <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
           <span>{formatRuntime(movie.runtimeMinutes)}</span>

@@ -32,6 +32,7 @@ export function normalizeMovie(raw: Partial<Movie>): Movie {
     title: raw.title,
     year: raw.year,
     genres: Array.isArray(raw.genres) ? raw.genres : [],
+    tags: Array.isArray(raw.tags) ? raw.tags : [],
     runtimeMinutes: raw.runtimeMinutes,
     ratingSources: raw.ratingSources && typeof raw.ratingSources === 'object' ? raw.ratingSources : {},
     posterUrl: raw.posterUrl,

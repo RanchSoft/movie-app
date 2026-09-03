@@ -1,6 +1,7 @@
 export interface Filters {
   query: string
   genre: string
+  tag: string
   maxRuntime: number | null
   availability: 'all' | 'physical' | 'streaming' | 'free'
   watched: 'all' | 'watched' | 'unwatched'
@@ -10,6 +11,7 @@ export interface Filters {
 export const DEFAULT_FILTERS: Filters = {
   query: '',
   genre: 'all',
+  tag: 'all',
   maxRuntime: null,
   availability: 'all',
   watched: 'all',
@@ -20,9 +22,10 @@ interface Props {
   filters: Filters
   onChange: (filters: Filters) => void
   genres: string[]
+  tags: string[]
 }
 
-export function FilterBar({ filters, onChange, genres }: Props) {
+export function FilterBar({ filters, onChange, genres, tags }: Props) {
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     onChange({ ...filters, [key]: value })
 
@@ -45,6 +48,18 @@ export function FilterBar({ filters, onChange, genres }: Props) {
           {genres.map((g) => (
             <option key={g} value={g}>
               {g}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.tag}
+          onChange={(e) => set('tag', e.target.value)}
+          className="rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+        >
+          <option value="all">All tags</option>
+          {tags.map((t) => (
+            <option key={t} value={t}>
+              {t}
             </option>
           ))}
         </select>
