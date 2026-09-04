@@ -4,7 +4,10 @@ import { exportLibraryFile, parseImportedLibrary } from '../store/storage'
 import { useTmdbKey } from '../store/useTmdbKey'
 import { useStreamingPrefs } from '../store/useStreamingPrefs'
 import { useUsers } from '../store/useUsers'
+import { useLastBackup } from '../store/useLastBackup'
+import { formatRelativeTime } from '../utils/format'
 import { ProviderPicker } from './ProviderPicker'
+import { TagManager } from './TagManager'
 
 export function SettingsView() {
   const { movies, sessions, replaceAll } = useLibrary()
@@ -16,6 +19,7 @@ export function SettingsView() {
   const [regionDraft, setRegionDraft] = useState(region)
   const { users, addUser, removeUser } = useUsers()
   const [nameDraft, setNameDraft] = useState('')
+  const { lastBackupAt, recordBackup } = useLastBackup()
 
   const handleAddUser = () => {
     addUser(nameDraft)
@@ -24,6 +28,7 @@ export function SettingsView() {
 
   const handleExport = () => {
     exportLibraryFile({ version: 1, movies, sessions })
+    recordBackup()
   }
 
   const handleImportClick = () => fileInputRef.current?.click()
@@ -77,6 +82,9 @@ export function SettingsView() {
           </button>
           <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileChange} />
         </div>
+        <p className="mt-2 text-xs text-slate-500">
+          {lastBackupAt ? `Last backup: ${formatRelativeTime(lastBackupAt)}.` : "You haven't exported a backup yet."}
+        </p>
       </div>
 
       <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
@@ -210,6 +218,15 @@ export function SettingsView() {
         ) : (
           <p className="mt-3 text-xs text-slate-500">No one added yet.</p>
         )}
+      </div>
+
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+        <h2 className="font-medium text-slate-100">Tags</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Rename or delete tags across your whole library at once — handy for merging near-duplicates like "Time
+          Travel" and "Time-Travel" that TMDb autofill can introduce.
+        </p>
+        <TagManager />
       </div>
 
       <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4 text-sm text-slate-400">

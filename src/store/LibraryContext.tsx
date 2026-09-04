@@ -14,6 +14,10 @@ interface LibraryContextValue {
   deleteSession: (id: string) => void
   statsFor: (movieId: string) => MovieStats
   replaceAll: (data: LibraryData) => void
+  /** Renames a tag across every movie that has it (case-insensitive match); merges into an existing tag of the new name instead of duplicating it. */
+  renameTag: (oldName: string, newName: string) => void
+  /** Removes a tag from every movie that has it. */
+  deleteTag: (name: string) => void
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
@@ -90,6 +94,31 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       statsFor: (movieId) =>
         statsByMovie.get(movieId) ?? { timesWatched: 0, timesShortlisted: 0, lastWatchedDate: null },
       replaceAll: (newData) => setData(newData),
+      renameTag: (oldName, newName) => {
+        const trimmedNew = newName.trim()
+        if (!trimmedNew) return
+        const now = new Date().toISOString()
+        setData((prev) => ({
+          ...prev,
+          movies: prev.movies.map((m) => {
+            if (!m.tags.some((t) => t.toLowerCase() === oldName.toLowerCase())) return m
+            const withoutOld = m.tags.filter((t) => t.toLowerCase() !== oldName.toLowerCase())
+            const alreadyHasNew = withoutOld.some((t) => t.toLowerCase() === trimmedNew.toLowerCase())
+            return { ...m, tags: alreadyHasNew ? withoutOld : [...withoutOld, trimmedNew], updatedAt: now }
+          }),
+        }))
+      },
+      deleteTag: (name) => {
+        const now = new Date().toISOString()
+        setData((prev) => ({
+          ...prev,
+          movies: prev.movies.map((m) =>
+            m.tags.some((t) => t.toLowerCase() === name.toLowerCase())
+              ? { ...m, tags: m.tags.filter((t) => t.toLowerCase() !== name.toLowerCase()), updatedAt: now }
+              : m,
+          ),
+        }))
+      },
     }
   }, [data])
 

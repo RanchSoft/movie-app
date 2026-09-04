@@ -35,3 +35,21 @@ export function todayIso(): string {
   const day = String(d.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+export function daysSince(iso: string): number {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return 0
+  return Math.floor((Date.now() - then) / (1000 * 60 * 60 * 24))
+}
+
+/** Coarse "N days/months/years ago" for a full ISO timestamp — not calendar-precise, just a nudge. */
+export function formatRelativeTime(iso: string): string {
+  const days = daysSince(iso)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 30) return `${days} days ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`
+  const years = Math.floor(months / 12)
+  return `${years} year${years === 1 ? '' : 's'} ago`
+}

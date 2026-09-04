@@ -6,6 +6,7 @@ import { ShortlistView } from './components/ShortlistView'
 import { HistoryView } from './components/HistoryView'
 import { StatsView } from './components/StatsView'
 import { SettingsView } from './components/SettingsView'
+import { BackupReminderBanner } from './components/BackupReminderBanner'
 
 type Tab = 'library' | 'shortlist' | 'history' | 'stats' | 'settings'
 
@@ -23,6 +24,7 @@ function AppShell() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-4xl flex-col bg-slate-950 pb-20 text-slate-100">
+      <BackupReminderBanner />
       <main className="flex-1 p-3 sm:p-4">
         {tab === 'library' ? <LibraryView shortlist={shortlist} onToggleShortlist={toggle} /> : null}
         {tab === 'shortlist' ? <ShortlistView shortlist={shortlist} onRemove={remove} onClear={clear} /> : null}
