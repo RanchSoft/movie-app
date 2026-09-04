@@ -72,7 +72,9 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
         byUser: submittedUsers.map((user) => ({ user, rank: perUser.get(user)?.get(movie.id) ?? null })),
       }))
       .sort((a, b) => b.score - a.score)
-    return rows
+    const topScore = rows[0]?.score ?? 0
+    const tiedForFirst = rows.filter((r) => r.score === topScore).length
+    return { rows, topScore, tiedForFirst }
   }, [movies, rankings, users, movieIds, submittedUsers])
 
   if (movies.length === 0) return null
@@ -92,19 +94,28 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
     <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-medium text-slate-100">🤫 Secret ranking</p>
-        <label className="flex items-center gap-1.5 text-xs text-slate-400">
-          Top
-          <input
-            type="number"
-            min={1}
-            max={Math.max(1, movies.length)}
-            value={topN}
-            onChange={(e) => setTopN(Number(e.target.value) || 1)}
-            disabled={!!activeUser}
-            className="w-12 rounded border border-slate-600 bg-slate-800 px-1.5 py-0.5 text-center text-slate-100 disabled:opacity-50"
-          />
-          picks
-        </label>
+        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <span>Top picks</span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setTopN((n) => Math.max(1, n - 1))}
+              disabled={!!activeUser || effectiveTopN <= 1}
+              className="flex h-7 w-7 items-center justify-center rounded bg-slate-700 text-sm font-semibold text-slate-100 hover:bg-slate-600 disabled:opacity-40"
+            >
+              –
+            </button>
+            <span className="w-5 text-center text-sm font-semibold text-slate-100">{effectiveTopN}</span>
+            <button
+              type="button"
+              onClick={() => setTopN((n) => Math.min(Math.max(1, movies.length), n + 1))}
+              disabled={!!activeUser || effectiveTopN >= movies.length}
+              className="flex h-7 w-7 items-center justify-center rounded bg-slate-700 text-sm font-semibold text-slate-100 hover:bg-slate-600 disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+        </div>
       </div>
 
       {activeUser ? (
@@ -204,46 +215,59 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
           </div>
 
           {revealed ? (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-slate-400">
-                    <th className="pb-1 pr-2 font-medium">Movie</th>
-                    {submittedUsers.map((user) => (
-                      <th key={user} className="pb-1 px-2 text-center font-medium">
-                        {user}
-                      </th>
-                    ))}
-                    <th className="pb-1 pl-2 text-right font-medium">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {consensus.map((row, i) => (
-                    <tr
-                      key={row.movie.id}
-                      className={i === 0 ? 'bg-amber-950/30 text-amber-200' : 'text-slate-200'}
-                    >
-                      <td className="py-1 pr-2">
-                        {i === 0 ? '🏆 ' : ''}
-                        {row.movie.title}
-                      </td>
-                      {row.byUser.map(({ user, rank }) => (
-                        <td key={user} className="py-1 px-2 text-center text-slate-400">
-                          {rank ?? '—'}
-                        </td>
+            <div className="mt-3">
+              {consensus.tiedForFirst > 1 ? (
+                <p className="mb-2 rounded border border-amber-800 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-300">
+                  🤝 It's a {consensus.tiedForFirst}-way tie for first at {consensus.topScore} point
+                  {consensus.topScore === 1 ? '' : 's'} — you'll have to break it yourselves.
+                </p>
+              ) : null}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-slate-400">
+                      <th className="pb-1 pr-2 font-medium">Movie</th>
+                      {submittedUsers.map((user) => (
+                        <th key={user} className="pb-1 px-2 text-center font-medium">
+                          {user}
+                        </th>
                       ))}
-                      <td className="py-1 pl-2 text-right font-semibold">{row.score}</td>
+                      <th className="pb-1 pl-2 text-right font-medium">Score</th>
                     </tr>
-                  ))}
-                  {consensus.length === 0 ? (
-                    <tr>
-                      <td colSpan={submittedUsers.length + 2} className="py-2 text-center text-slate-500">
-                        No picks yet.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {consensus.rows.map((row) => {
+                      const isTopTie = row.score === consensus.topScore && consensus.tiedForFirst > 1
+                      const isSoleWinner = row.score === consensus.topScore && consensus.tiedForFirst === 1
+                      return (
+                        <tr
+                          key={row.movie.id}
+                          className={isTopTie || isSoleWinner ? 'bg-amber-950/30 text-amber-200' : 'text-slate-200'}
+                        >
+                          <td className="py-1 pr-2">
+                            {isSoleWinner ? '🏆 ' : ''}
+                            {isTopTie ? '🤝 ' : ''}
+                            {row.movie.title}
+                          </td>
+                          {row.byUser.map(({ user, rank }) => (
+                            <td key={user} className="py-1 px-2 text-center text-slate-400">
+                              {rank ?? '—'}
+                            </td>
+                          ))}
+                          <td className="py-1 pl-2 text-right font-semibold">{row.score}</td>
+                        </tr>
+                      )
+                    })}
+                    {consensus.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={submittedUsers.length + 2} className="py-2 text-center text-slate-500">
+                          No picks yet.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : null}
         </>
