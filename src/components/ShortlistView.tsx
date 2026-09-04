@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useLibrary } from '../store/LibraryContext'
 import { useUsers } from '../store/useUsers'
 import { useSecretRankings } from '../store/useSecretRankings'
+import { useVetoes } from '../store/useVetoes'
 import { SecretRanking } from './SecretRanking'
+import { VetoPanel } from './VetoPanel'
 import { formatRuntime, parseTagList, todayIso } from '../utils/format'
 
 interface Props {
@@ -15,6 +17,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
   const { movies, addSession } = useLibrary()
   const { users } = useUsers()
   const { rankings, submitRanking, clearAll: clearRankings } = useSecretRankings()
+  const { vetoes, setVeto, clearVeto, clearAll: clearVetoes } = useVetoes()
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [pickMethod, setPickMethod] = useState<'random' | 'manual' | null>(null)
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([])
@@ -30,12 +33,15 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
     .map((id) => movies.find((m) => m.id === id))
     .filter((m): m is NonNullable<typeof m> => !!m)
 
+  const vetoedIds = new Set(Object.values(vetoes))
+  const eligibleMovies = shortlistMovies.filter((m) => !vetoedIds.has(m.id))
+
   const pickRandom = () => {
-    if (shortlistMovies.length === 0) return
+    if (eligibleMovies.length === 0) return
     setRolling(true)
     let ticks = 0
     const interval = setInterval(() => {
-      const rand = shortlistMovies[Math.floor(Math.random() * shortlistMovies.length)]
+      const rand = eligibleMovies[Math.floor(Math.random() * eligibleMovies.length)]
       setPickedId(rand.id)
       ticks += 1
       if (ticks > 12) {
@@ -70,11 +76,13 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
     setNotes('')
     onClear()
     clearRankings()
+    clearVetoes()
   }
 
   const clearShortlist = () => {
     onClear()
     clearRankings()
+    clearVetoes()
   }
 
   const pickedMovie = pickedId ? movies.find((m) => m.id === pickedId) : null
@@ -114,26 +122,38 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
       ) : (
         <>
           <div className="flex flex-col gap-2">
-            {shortlistMovies.map((movie) => (
-              <div
-                key={movie.id}
-                className={`flex items-center justify-between rounded border px-3 py-2 ${
-                  pickedId === movie.id ? 'border-emerald-500 bg-emerald-950/40' : 'border-slate-700 bg-slate-800/40'
-                }`}
-              >
-                <button type="button" onClick={() => pickManual(movie.id)} className="flex-1 text-left">
-                  <span className="font-medium text-slate-100">{movie.title}</span>{' '}
-                  <span className="text-xs text-slate-400">{formatRuntime(movie.runtimeMinutes)}</span>
-                </button>
-                <button type="button" onClick={() => onRemove(movie.id)} className="px-2 text-slate-500 hover:text-red-400">
-                  ✕
-                </button>
-              </div>
-            ))}
+            {shortlistMovies.map((movie) => {
+              const vetoed = vetoedIds.has(movie.id)
+              return (
+                <div
+                  key={movie.id}
+                  className={`flex items-center justify-between rounded border px-3 py-2 ${
+                    pickedId === movie.id
+                      ? 'border-emerald-500 bg-emerald-950/40'
+                      : vetoed
+                        ? 'border-slate-800 bg-slate-900/40'
+                        : 'border-slate-700 bg-slate-800/40'
+                  }`}
+                >
+                  <button type="button" onClick={() => pickManual(movie.id)} className="flex-1 text-left">
+                    <span className={`font-medium ${vetoed ? 'text-slate-500 line-through' : 'text-slate-100'}`}>
+                      {movie.title}
+                    </span>{' '}
+                    <span className="text-xs text-slate-400">{formatRuntime(movie.runtimeMinutes)}</span>
+                    {vetoed ? <span className="ml-1.5 text-xs text-red-400">🚫 vetoed</span> : null}
+                  </button>
+                  <button type="button" onClick={() => onRemove(movie.id)} className="px-2 text-slate-500 hover:text-red-400">
+                    ✕
+                  </button>
+                </div>
+              )
+            })}
           </div>
 
+          <VetoPanel movies={shortlistMovies} users={users} vetoes={vetoes} onSetVeto={setVeto} onClearVeto={clearVeto} />
+
           <SecretRanking
-            movies={shortlistMovies}
+            movies={eligibleMovies}
             users={users}
             rankings={rankings}
             onSubmit={submitRanking}
@@ -143,10 +163,14 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
           <button
             type="button"
             onClick={pickRandom}
-            disabled={rolling}
+            disabled={rolling || eligibleMovies.length === 0}
             className="rounded bg-emerald-600 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
           >
-            {rolling ? 'Picking…' : '🎲 Pick random'}
+            {rolling
+              ? 'Picking…'
+              : eligibleMovies.length === 0
+                ? 'Everything vetoed — undo one to roll'
+                : '🎲 Pick random'}
           </button>
 
           {pickedMovie ? (
