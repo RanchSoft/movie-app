@@ -3,6 +3,7 @@ import { useLibrary } from '../store/LibraryContext'
 import { exportLibraryFile, parseImportedLibrary } from '../store/storage'
 import { useTmdbKey } from '../store/useTmdbKey'
 import { useStreamingPrefs } from '../store/useStreamingPrefs'
+import { useUsers } from '../store/useUsers'
 import { ProviderPicker } from './ProviderPicker'
 
 export function SettingsView() {
@@ -13,6 +14,13 @@ export function SettingsView() {
   const [keySaved, setKeySaved] = useState(false)
   const { services, setServices, region, setRegion } = useStreamingPrefs()
   const [regionDraft, setRegionDraft] = useState(region)
+  const { users, addUser, removeUser } = useUsers()
+  const [nameDraft, setNameDraft] = useState('')
+
+  const handleAddUser = () => {
+    addUser(nameDraft)
+    setNameDraft('')
+  }
 
   const handleExport = () => {
     exportLibraryFile({ version: 1, movies, sessions })
@@ -151,6 +159,57 @@ export function SettingsView() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+        <h2 className="font-medium text-slate-100">Movie night crew</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Add names for the people who usually pick movie night. Used for the secret ranking feature in Shortlist,
+          where each person privately ranks their favorites before everyone reveals picks together.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                handleAddUser()
+              }
+            }}
+            placeholder="Name"
+            className="flex-1 rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500"
+          />
+          <button
+            type="button"
+            onClick={handleAddUser}
+            className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
+          >
+            Add
+          </button>
+        </div>
+        {users.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {users.map((user) => (
+              <span
+                key={user}
+                className="flex items-center gap-1.5 rounded bg-slate-700 px-2 py-1 text-sm text-slate-100"
+              >
+                {user}
+                <button
+                  type="button"
+                  onClick={() => removeUser(user)}
+                  className="text-slate-400 hover:text-red-400"
+                  title={`Remove ${user}`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-slate-500">No one added yet.</p>
+        )}
       </div>
 
       <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4 text-sm text-slate-400">

@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useLibrary } from '../store/LibraryContext'
+import { useUsers } from '../store/useUsers'
+import { useSecretRankings } from '../store/useSecretRankings'
+import { SecretRanking } from './SecretRanking'
 import { formatRuntime, parseTagList, todayIso } from '../utils/format'
 
 interface Props {
@@ -10,6 +13,8 @@ interface Props {
 
 export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
   const { movies, addSession } = useLibrary()
+  const { users } = useUsers()
+  const { rankings, submitRanking, clearAll: clearRankings } = useSecretRankings()
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [pickMethod, setPickMethod] = useState<'random' | 'manual' | null>(null)
   const [attendees, setAttendees] = useState('')
@@ -56,6 +61,12 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
     setAttendees('')
     setNotes('')
     onClear()
+    clearRankings()
+  }
+
+  const clearShortlist = () => {
+    onClear()
+    clearRankings()
   }
 
   const pickedMovie = pickedId ? movies.find((m) => m.id === pickedId) : null
@@ -81,7 +92,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
             <button type="button" onClick={copyShortlist} className="text-sm text-slate-400 hover:text-slate-200">
               {copied ? 'Copied ✓' : '📋 Copy list'}
             </button>
-            <button type="button" onClick={onClear} className="text-sm text-slate-400 hover:text-red-400">
+            <button type="button" onClick={clearShortlist} className="text-sm text-slate-400 hover:text-red-400">
               Clear all
             </button>
           </div>
@@ -112,6 +123,14 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
               </div>
             ))}
           </div>
+
+          <SecretRanking
+            movies={shortlistMovies}
+            users={users}
+            rankings={rankings}
+            onSubmit={submitRanking}
+            onClearAll={clearRankings}
+          />
 
           <button
             type="button"
