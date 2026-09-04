@@ -17,10 +17,14 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
   const { rankings, submitRanking, clearAll: clearRankings } = useSecretRankings()
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [pickMethod, setPickMethod] = useState<'random' | 'manual' | null>(null)
-  const [attendees, setAttendees] = useState('')
+  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([])
+  const [extraAttendees, setExtraAttendees] = useState('')
   const [notes, setNotes] = useState('')
   const [rolling, setRolling] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const toggleAttendee = (user: string) =>
+    setSelectedAttendees((prev) => (prev.includes(user) ? prev.filter((u) => u !== user) : [...prev, user]))
 
   const shortlistMovies = shortlist
     .map((id) => movies.find((m) => m.id === id))
@@ -48,17 +52,21 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
   }
 
   const saveSession = () => {
+    const extras = parseTagList(extraAttendees).filter(
+      (name) => !selectedAttendees.some((u) => u.toLowerCase() === name.toLowerCase()),
+    )
     addSession({
       date: todayIso(),
       shortlistMovieIds: shortlist,
       pickedMovieId: pickedId,
       pickMethod,
-      attendees: parseTagList(attendees),
+      attendees: [...selectedAttendees, ...extras],
       notes: notes.trim() || undefined,
     })
     setPickedId(null)
     setPickMethod(null)
-    setAttendees('')
+    setSelectedAttendees([])
+    setExtraAttendees('')
     setNotes('')
     onClear()
     clearRankings()
@@ -147,14 +155,37 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
               <p className="text-lg font-bold text-slate-100">{pickedMovie.title}</p>
 
               <div className="mt-3 flex flex-col gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-slate-400">Who's watching (comma separated)</span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-slate-400">Who's watching</span>
+                  {users.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {users.map((user) => {
+                        const selected = selectedAttendees.includes(user)
+                        return (
+                          <button
+                            key={user}
+                            type="button"
+                            onClick={() => toggleAttendee(user)}
+                            className={`rounded px-2.5 py-1 text-xs font-medium ${
+                              selected
+                                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            {selected ? '✓ ' : ''}
+                            {user}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                   <input
-                    value={attendees}
-                    onChange={(e) => setAttendees(e.target.value)}
-                    className="rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100"
+                    value={extraAttendees}
+                    onChange={(e) => setExtraAttendees(e.target.value)}
+                    placeholder={users.length > 0 ? 'Anyone else? (comma separated)' : "Who's watching (comma separated)"}
+                    className="rounded border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500"
                   />
-                </label>
+                </div>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-slate-400">Notes</span>
                   <input
