@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Movie } from '../types'
 import type { Rankings } from '../store/useSecretRankings'
+import { pickRandomTiebreak, type TiebreakerDef } from '../tiebreakers'
 
 interface Props {
   movies: Movie[]
@@ -10,11 +11,25 @@ interface Props {
   onClearAll: () => void
 }
 
+interface TiebreakState {
+  tiedIds: string[]
+  spinning: boolean
+  displayTitle: string
+  method?: TiebreakerDef
+  winner?: Movie
+}
+
 export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }: Props) {
   const [topN, setTopN] = useState(3)
   const [activeUser, setActiveUser] = useState<string | null>(null)
   const [picks, setPicks] = useState<string[]>([])
   const [revealed, setRevealed] = useState(false)
+  const [tiebreak, setTiebreak] = useState<TiebreakState | null>(null)
+  const spinTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => () => {
+    if (spinTimer.current) clearInterval(spinTimer.current)
+  }, [])
 
   const movieIds = useMemo(() => new Set(movies.map((m) => m.id)), [movies])
   const effectiveTopN = Math.max(1, Math.min(topN, movies.length || 1))
@@ -76,6 +91,39 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
     const tiedForFirst = rows.filter((r) => r.score === topScore).length
     return { rows, topScore, tiedForFirst }
   }, [movies, rankings, users, movieIds, submittedUsers])
+
+  const tiedMovies = useMemo(
+    () =>
+      consensus.tiedForFirst > 1
+        ? consensus.rows.filter((r) => r.score === consensus.topScore).map((r) => r.movie)
+        : [],
+    [consensus],
+  )
+  const tiedIdsKey = useMemo(() => [...tiedMovies.map((m) => m.id)].sort().join(','), [tiedMovies])
+
+  const breakTie = () => {
+    if (tiedMovies.length < 2) return
+    if (spinTimer.current) clearInterval(spinTimer.current)
+    const tiedIds = tiedMovies.map((m) => m.id).sort()
+    const choice = pickRandomTiebreak(tiedMovies)
+    setTiebreak({ tiedIds, spinning: true, displayTitle: tiedMovies[0].title })
+    let ticks = 0
+    spinTimer.current = setInterval(() => {
+      const rand = tiedMovies[Math.floor(Math.random() * tiedMovies.length)]
+      setTiebreak((prev) => (prev ? { ...prev, displayTitle: rand.title } : prev))
+      ticks += 1
+      if (ticks > 10) {
+        if (spinTimer.current) clearInterval(spinTimer.current)
+        setTiebreak({
+          tiedIds,
+          spinning: false,
+          displayTitle: choice.winner.title,
+          method: choice.method,
+          winner: choice.winner,
+        })
+      }
+    }, 80)
+  }
 
   if (movies.length === 0) return null
 
@@ -217,10 +265,43 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
           {revealed ? (
             <div className="mt-3">
               {consensus.tiedForFirst > 1 ? (
-                <p className="mb-2 rounded border border-amber-800 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-300">
-                  🤝 It's a {consensus.tiedForFirst}-way tie for first at {consensus.topScore} point
-                  {consensus.topScore === 1 ? '' : 's'} — you'll have to break it yourselves.
-                </p>
+                <div className="mb-2 rounded border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+                  <p>
+                    🤝 It's a {consensus.tiedForFirst}-way tie for first at {consensus.topScore} point
+                    {consensus.topScore === 1 ? '' : 's'}.
+                  </p>
+                  {tiebreak && tiebreak.tiedIds.join(',') === tiedIdsKey ? (
+                    <div className="mt-2">
+                      {tiebreak.spinning ? (
+                        <p className="animate-pulse font-semibold text-amber-200">🎲 {tiebreak.displayTitle}…</p>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-amber-200">
+                            {tiebreak.method?.icon} {tiebreak.method?.label} → 🏆 {tiebreak.winner?.title}
+                          </p>
+                          <p className="mt-0.5 text-amber-400">
+                            {tiebreak.method && tiebreak.winner ? tiebreak.method.describe(tiebreak.winner) : null}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={breakTie}
+                            className="mt-1.5 rounded bg-amber-900/60 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-900"
+                          >
+                            🎲 Break it again
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={breakTie}
+                      className="mt-2 w-full rounded bg-amber-700 py-1.5 text-sm font-semibold text-white hover:bg-amber-600"
+                    >
+                      🎲 Break the tie
+                    </button>
+                  )}
+                </div>
               ) : null}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -239,6 +320,9 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
                     {consensus.rows.map((row) => {
                       const isTopTie = row.score === consensus.topScore && consensus.tiedForFirst > 1
                       const isSoleWinner = row.score === consensus.topScore && consensus.tiedForFirst === 1
+                      const tiebreakResolved =
+                        tiebreak && !tiebreak.spinning && tiebreak.tiedIds.join(',') === tiedIdsKey
+                      const isTiebreakWinner = isTopTie && tiebreakResolved && tiebreak?.winner?.id === row.movie.id
                       return (
                         <tr
                           key={row.movie.id}
@@ -246,7 +330,7 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
                         >
                           <td className="py-1 pr-2">
                             {isSoleWinner ? '🏆 ' : ''}
-                            {isTopTie ? '🤝 ' : ''}
+                            {isTiebreakWinner ? '🏆 ' : isTopTie ? '🤝 ' : ''}
                             {row.movie.title}
                           </td>
                           {row.byUser.map(({ user, rank }) => (
