@@ -24,6 +24,32 @@ export const DEFAULT_FILTERS: Filters = {
   sort: 'title',
 }
 
+export interface FilterPreset {
+  id: string
+  label: string
+  icon: string
+  overrides: Partial<Filters>
+}
+
+// Each preset resets every other filter to default and applies its own overrides — a clean
+// "mood" rather than stacking on whatever's already set. Tapping an active one toggles it off.
+export const FILTER_PRESETS: FilterPreset[] = [
+  { id: 'short', label: 'Something short', icon: '🍿', overrides: { kind: 'movie', maxRuntime: 100 } },
+  { id: 'unwatched', label: 'Never watched', icon: '🆕', overrides: { kind: 'movie', watched: 'unwatched' } },
+  { id: 'free', label: 'Free tonight', icon: '💸', overrides: { kind: 'movie', availability: 'free' } },
+]
+
+function presetTarget(preset: FilterPreset, sort: Filters['sort']): Filters {
+  return { ...DEFAULT_FILTERS, ...preset.overrides, sort }
+}
+
+// Sort is a display preference, not part of what a preset (or "Clear filters") controls.
+function filtersEqualIgnoringSort(a: Filters, b: Filters): boolean {
+  const { sort: _a, ...restA } = a
+  const { sort: _b, ...restB } = b
+  return JSON.stringify(restA) === JSON.stringify(restB)
+}
+
 interface Props {
   filters: Filters
   onChange: (filters: Filters) => void
@@ -35,13 +61,34 @@ export function FilterBar({ filters, onChange, genres, tags }: Props) {
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     onChange({ ...filters, [key]: value })
 
-  // Sort is a display preference, not a filter — clearing filters leaves it alone.
-  const { sort: _sort, ...activeFilterFields } = filters
-  const { sort: _defaultSort, ...defaultFilterFields } = DEFAULT_FILTERS
-  const hasActiveFilters = JSON.stringify(activeFilterFields) !== JSON.stringify(defaultFilterFields)
+  const hasActiveFilters = !filtersEqualIgnoringSort(filters, DEFAULT_FILTERS)
+
+  const applyPreset = (preset: FilterPreset) => {
+    const target = presetTarget(preset, filters.sort)
+    onChange(filtersEqualIgnoringSort(filters, target) ? { ...DEFAULT_FILTERS, sort: filters.sort } : target)
+  }
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/40 p-3">
+      <div className="flex flex-wrap gap-2">
+        {FILTER_PRESETS.map((preset) => {
+          const active = filtersEqualIgnoringSort(filters, presetTarget(preset, filters.sort))
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => applyPreset(preset)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                active
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              {preset.icon} {preset.label}
+            </button>
+          )
+        })}
+      </div>
       <div className="flex gap-2">
         <input
           type="search"
@@ -120,6 +167,7 @@ export function FilterBar({ filters, onChange, genres, tags }: Props) {
         >
           <option value="">Any runtime</option>
           <option value="90">Under 90m</option>
+          <option value="100">Under 100m</option>
           <option value="120">Under 2h</option>
           <option value="150">Under 2.5h</option>
         </select>
