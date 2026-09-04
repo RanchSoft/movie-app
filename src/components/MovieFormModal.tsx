@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Movie, MovieKind, MovieStats, PhysicalCopy, PhysicalFormat, StreamingAvailability } from '../types'
 import { parseTagList, formatDate } from '../utils/format'
+import { deriveAutoTags } from '../utils/autoTags'
 import { computeRating, RATING_SOURCES } from '../ratingSources'
 import { useTmdbKey } from '../store/useTmdbKey'
 import { useStreamingPrefs } from '../store/useStreamingPrefs'
@@ -111,6 +112,17 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
       if (details.genres.length > 0) setGenres(details.genres.join(', '))
       if (details.runtimeMinutes) setRuntime(details.runtimeMinutes.toString())
       if (details.posterUrl) setPosterUrl(details.posterUrl)
+
+      const autoTags = deriveAutoTags(details)
+      if (autoTags.length > 0) {
+        setTags((prev) => {
+          const existing = parseTagList(prev)
+          const existingLower = new Set(existing.map((t) => t.toLowerCase()))
+          const additions = autoTags.filter((t) => !existingLower.has(t.toLowerCase()))
+          return [...existing, ...additions].join(', ')
+        })
+      }
+
       setTmdbResults(null)
       setTmdbQuery('')
 

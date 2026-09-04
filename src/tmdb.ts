@@ -17,6 +17,10 @@ export interface TmdbMovieDetails {
   genres: string[]
   runtimeMinutes?: number
   posterUrl?: string
+  /** ISO 639-1 code, e.g. "en", "fr", "ja". */
+  originalLanguage?: string
+  /** TMDb's thematic keywords, e.g. "time travel", "based on novel or book". */
+  keywords: string[]
 }
 
 async function tmdbFetch(path: string, apiKey: string): Promise<unknown> {
@@ -55,10 +59,14 @@ export async function search(apiKey: string, query: string, kind: MovieKind): Pr
   }))
 }
 
-/** For TV, `runtimeMinutes` comes from `episode_run_time` (typical episode length, not the whole series). */
+/**
+ * For TV, `runtimeMinutes` comes from `episode_run_time` (typical episode length, not the whole
+ * series). Keywords are bundled in via `append_to_response` to avoid a second request — TMDb
+ * nests them differently per kind: `{ keywords: [...] }` for movies, `{ results: [...] }` for TV.
+ */
 export async function getDetails(apiKey: string, id: number, kind: MovieKind): Promise<TmdbMovieDetails> {
   const path = kind === 'movie' ? `/movie/${id}` : `/tv/${id}`
-  const data = (await tmdbFetch(path, apiKey)) as {
+  const data = (await tmdbFetch(`${path}?append_to_response=keywords`, apiKey)) as {
     title?: string
     name?: string
     release_date?: string
@@ -67,13 +75,18 @@ export async function getDetails(apiKey: string, id: number, kind: MovieKind): P
     runtime?: number
     episode_run_time?: number[]
     poster_path?: string | null
+    original_language?: string
+    keywords?: { keywords?: { name: string }[]; results?: { name: string }[] }
   }
+  const keywordList = kind === 'movie' ? data.keywords?.keywords : data.keywords?.results
   return {
     title: (kind === 'movie' ? data.title : data.name) ?? '',
     year: yearFromDate(kind === 'movie' ? data.release_date : data.first_air_date),
     genres: data.genres.map((g) => g.name),
     runtimeMinutes: (kind === 'movie' ? data.runtime : data.episode_run_time?.[0]) || undefined,
     posterUrl: data.poster_path ? `${POSTER_BASE}${data.poster_path}` : undefined,
+    originalLanguage: data.original_language,
+    keywords: (keywordList ?? []).map((k) => k.name),
   }
 }
 
