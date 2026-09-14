@@ -9,6 +9,7 @@ interface Props {
   rankings: Rankings
   onSubmit: (user: string, movieIds: string[]) => void
   onClearAll: () => void
+  onMarkWatched: (movieId: string) => void
 }
 
 interface TiebreakState {
@@ -19,8 +20,20 @@ interface TiebreakState {
   winner?: Movie
 }
 
-export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }: Props) {
-  const [topN, setTopN] = useState(3)
+/**
+ * Smallest top-N that GUARANTEES at least one movie is picked by 2+ different people (pigeonhole:
+ * each user's own picks are distinct, so if userCount * topN > shortlistSize, some movie must
+ * repeat across users, not just within one person's list).
+ */
+function suggestedTopN(shortlistSize: number, userCount: number): number {
+  if (shortlistSize <= 0) return 1
+  if (userCount <= 1) return shortlistSize
+  const minForOverlap = Math.floor(shortlistSize / userCount) + 1
+  return Math.max(1, Math.min(shortlistSize, minForOverlap))
+}
+
+export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll, onMarkWatched }: Props) {
+  const [topN, setTopN] = useState(() => suggestedTopN(movies.length, users.length))
   const [activeUser, setActiveUser] = useState<string | null>(null)
   const [picks, setPicks] = useState<string[]>([])
   const [revealed, setRevealed] = useState(false)
@@ -30,6 +43,11 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
   useEffect(() => () => {
     if (spinTimer.current) clearInterval(spinTimer.current)
   }, [])
+
+  // Re-suggest whenever the candidate pool or crew size changes, so the overlap guarantee keeps holding.
+  useEffect(() => {
+    setTopN(suggestedTopN(movies.length, users.length))
+  }, [movies.length, users.length])
 
   const movieIds = useMemo(() => new Set(movies.map((m) => m.id)), [movies])
   const effectiveTopN = Math.max(1, Math.min(topN, movies.length || 1))
@@ -81,25 +99,49 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
     }
     const rows = movies
       .filter((m) => (scores.get(m.id) ?? 0) > 0)
-      .map((movie) => ({
-        movie,
-        score: scores.get(movie.id) ?? 0,
-        byUser: submittedUsers.map((user) => ({ user, rank: perUser.get(user)?.get(movie.id) ?? null })),
-      }))
+      .map((movie) => {
+        const byUser = submittedUsers.map((user) => ({ user, rank: perUser.get(user)?.get(movie.id) ?? null }))
+        return {
+          movie,
+          score: scores.get(movie.id) ?? 0,
+          byUser,
+          voterCount: byUser.filter((x) => x.rank !== null).length,
+        }
+      })
       .sort((a, b) => b.score - a.score)
-    const topScore = rows[0]?.score ?? 0
-    const tiedForFirst = rows.filter((r) => r.score === topScore).length
-    return { rows, topScore, tiedForFirst }
+
+    // A pick with support from just one person shouldn't beat one two+ people actually agree on —
+    // only fall back to allowing a solo pick to win when nothing has multi-person overlap at all.
+    const multiVoterRows = rows.filter((r) => r.voterCount >= 2)
+    const requiresOverlap = multiVoterRows.length > 0
+    const contenders = requiresOverlap ? multiVoterRows : rows
+    const topScore = contenders[0]?.score ?? 0
+    const tiedForFirst = contenders.filter((r) => r.score === topScore).length
+
+    return { rows, topScore, tiedForFirst, requiresOverlap }
   }, [movies, rankings, users, movieIds, submittedUsers])
+
+  const isContender = (row: { score: number; voterCount: number }) =>
+    consensus.requiresOverlap ? row.voterCount >= 2 : true
 
   const tiedMovies = useMemo(
     () =>
       consensus.tiedForFirst > 1
-        ? consensus.rows.filter((r) => r.score === consensus.topScore).map((r) => r.movie)
+        ? consensus.rows.filter((r) => isContender(r) && r.score === consensus.topScore).map((r) => r.movie)
         : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [consensus],
   )
   const tiedIdsKey = useMemo(() => [...tiedMovies.map((m) => m.id)].sort().join(','), [tiedMovies])
+  const tiebreakResolved = !!tiebreak && !tiebreak.spinning && tiebreak.tiedIds.join(',') === tiedIdsKey
+
+  const soleWinner = useMemo(() => {
+    if (consensus.tiedForFirst !== 1) return null
+    return consensus.rows.find((r) => isContender(r) && r.score === consensus.topScore)?.movie ?? null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consensus])
+
+  const resolvedWinner = soleWinner ?? (tiebreakResolved ? (tiebreak?.winner ?? null) : null)
 
   const breakTie = () => {
     if (tiedMovies.length < 2) return
@@ -165,6 +207,9 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
           </div>
         </div>
       </div>
+      <p className="mt-0.5 text-[11px] text-slate-500">
+        Set high enough that a pick needs support from 2+ people to win outright.
+      </p>
 
       {activeUser ? (
         <div className="mt-3 flex flex-col gap-2">
@@ -264,6 +309,14 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
 
           {revealed ? (
             <div className="mt-3">
+              {consensus.requiresOverlap ? (
+                <p className="mb-2 text-[11px] text-slate-500">Only picks 2+ people agree on can win.</p>
+              ) : submittedUsers.length > 1 ? (
+                <p className="mb-2 text-[11px] text-slate-500">
+                  No overlapping picks yet — the top solo pick can win until one does.
+                </p>
+              ) : null}
+
               {consensus.tiedForFirst > 1 ? (
                 <div className="mb-2 rounded border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
                   <p>
@@ -303,6 +356,22 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
                   )}
                 </div>
               ) : null}
+
+              {resolvedWinner ? (
+                <div className="mb-2 flex items-center justify-between rounded border border-emerald-800 bg-emerald-950/30 px-3 py-2">
+                  <span className="text-sm text-emerald-300">
+                    🏆 <span className="font-semibold">{resolvedWinner.title}</span> wins
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onMarkWatched(resolvedWinner.id)}
+                    className="rounded bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                  >
+                    ✓ Mark watched
+                  </button>
+                </div>
+              ) : null}
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -318,11 +387,11 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
                   </thead>
                   <tbody>
                     {consensus.rows.map((row) => {
-                      const isTopTie = row.score === consensus.topScore && consensus.tiedForFirst > 1
-                      const isSoleWinner = row.score === consensus.topScore && consensus.tiedForFirst === 1
-                      const tiebreakResolved =
-                        tiebreak && !tiebreak.spinning && tiebreak.tiedIds.join(',') === tiedIdsKey
+                      const eligible = isContender(row)
+                      const isTopTie = eligible && row.score === consensus.topScore && consensus.tiedForFirst > 1
+                      const isSoleWinner = eligible && row.score === consensus.topScore && consensus.tiedForFirst === 1
                       const isTiebreakWinner = isTopTie && tiebreakResolved && tiebreak?.winner?.id === row.movie.id
+                      const needsAnotherVote = consensus.requiresOverlap && !eligible
                       return (
                         <tr
                           key={row.movie.id}
@@ -332,6 +401,9 @@ export function SecretRanking({ movies, users, rankings, onSubmit, onClearAll }:
                             {isSoleWinner ? '🏆 ' : ''}
                             {isTiebreakWinner ? '🏆 ' : isTopTie ? '🤝 ' : ''}
                             {row.movie.title}
+                            {needsAnotherVote ? (
+                              <span className="ml-1.5 text-[11px] text-slate-500">(1 vote — needs another)</span>
+                            ) : null}
                           </td>
                           {row.byUser.map(({ user, rank }) => (
                             <td key={user} className="py-1 px-2 text-center text-slate-400">
