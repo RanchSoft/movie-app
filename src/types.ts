@@ -38,7 +38,7 @@ export interface Movie {
   updatedAt: string
 }
 
-export type PickMethod = 'random' | 'manual'
+export type PickMethod = 'random' | 'manual' | 'consensus'
 
 export interface WatchSession {
   id: string

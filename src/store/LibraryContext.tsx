@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { nanoid } from 'nanoid'
 import type { LibraryData, Movie, MovieStats, WatchSession } from '../types'
 import { loadLibrary, saveLibrary } from './storage'
+import { todayIso } from '../utils/format'
 
 interface LibraryContextValue {
   movies: Movie[]
@@ -11,6 +12,8 @@ interface LibraryContextValue {
   updateMovie: (id: string, updates: Partial<Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>>) => void
   deleteMovie: (id: string) => void
   addSession: (session: Omit<WatchSession, 'id'>) => WatchSession
+  /** Ad-hoc "watched it today" log for a single movie, outside the shortlist flow — no attendees, no notes. */
+  markWatchedToday: (movieId: string) => void
   deleteSession: (id: string) => void
   statsFor: (movieId: string) => MovieStats
   replaceAll: (data: LibraryData) => void
@@ -87,6 +90,18 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         const newSession: WatchSession = { ...session, id: nanoid() }
         setData((prev) => ({ ...prev, sessions: [...prev.sessions, newSession] }))
         return newSession
+      },
+      markWatchedToday: (movieId) => {
+        const newSession: WatchSession = {
+          id: nanoid(),
+          date: todayIso(),
+          shortlistMovieIds: [movieId],
+          pickedMovieId: movieId,
+          pickMethod: 'manual',
+          attendees: [],
+          notes: undefined,
+        }
+        setData((prev) => ({ ...prev, sessions: [...prev.sessions, newSession] }))
       },
       deleteSession: (id) => {
         setData((prev) => ({ ...prev, sessions: prev.sessions.filter((s) => s.id !== id) }))
