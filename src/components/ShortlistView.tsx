@@ -5,7 +5,9 @@ import { useSecretRankings } from '../store/useSecretRankings'
 import { useVetoes } from '../store/useVetoes'
 import { SecretRanking } from './SecretRanking'
 import { VetoPanel } from './VetoPanel'
+import { MovieFormModal } from './MovieFormModal'
 import { formatRuntime, parseTagList, todayIso } from '../utils/format'
+import type { Movie, PickMethod } from '../types'
 
 interface Props {
   shortlist: string[]
@@ -14,17 +16,18 @@ interface Props {
 }
 
 export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
-  const { movies, addSession } = useLibrary()
+  const { movies, addSession, updateMovie, deleteMovie, markWatchedToday, statsFor } = useLibrary()
   const { users } = useUsers()
   const { rankings, submitRanking, clearAll: clearRankings } = useSecretRankings()
-  const { vetoes, setVeto, clearVeto, clearAll: clearVetoes } = useVetoes()
+  const { vetoes, toggleVeto, clearVeto, clearAll: clearVetoes } = useVetoes()
   const [pickedId, setPickedId] = useState<string | null>(null)
-  const [pickMethod, setPickMethod] = useState<'random' | 'manual' | null>(null)
+  const [pickMethod, setPickMethod] = useState<PickMethod | null>(null)
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([])
   const [extraAttendees, setExtraAttendees] = useState('')
   const [notes, setNotes] = useState('')
   const [rolling, setRolling] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [detailMovie, setDetailMovie] = useState<Movie | null>(null)
 
   const toggleAttendee = (user: string) =>
     setSelectedAttendees((prev) => (prev.includes(user) ? prev.filter((u) => u !== user) : [...prev, user]))
@@ -33,7 +36,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
     .map((id) => movies.find((m) => m.id === id))
     .filter((m): m is NonNullable<typeof m> => !!m)
 
-  const vetoedIds = new Set(Object.values(vetoes))
+  const vetoedIds = new Set(Object.values(vetoes).flat())
   const eligibleMovies = shortlistMovies.filter((m) => !vetoedIds.has(m.id))
 
   const pickRandom = () => {
@@ -57,18 +60,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
     setPickMethod('manual')
   }
 
-  const saveSession = () => {
-    const extras = parseTagList(extraAttendees).filter(
-      (name) => !selectedAttendees.some((u) => u.toLowerCase() === name.toLowerCase()),
-    )
-    addSession({
-      date: todayIso(),
-      shortlistMovieIds: shortlist,
-      pickedMovieId: pickedId,
-      pickMethod,
-      attendees: [...selectedAttendees, ...extras],
-      notes: notes.trim() || undefined,
-    })
+  const resetShortlistState = () => {
     setPickedId(null)
     setPickMethod(null)
     setSelectedAttendees([])
@@ -79,10 +71,26 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
     clearVetoes()
   }
 
+  /** Logs tonight's session. Defaults to whatever's currently staged, but a quick action (e.g. the
+   * consensus winner) can pass the movie + method directly without going through that staging step. */
+  const saveSession = (movieId: string | null = pickedId, method: PickMethod | null = pickMethod) => {
+    if (!movieId) return
+    const extras = parseTagList(extraAttendees).filter(
+      (name) => !selectedAttendees.some((u) => u.toLowerCase() === name.toLowerCase()),
+    )
+    addSession({
+      date: todayIso(),
+      shortlistMovieIds: shortlist,
+      pickedMovieId: movieId,
+      pickMethod: method,
+      attendees: [...selectedAttendees, ...extras],
+      notes: notes.trim() || undefined,
+    })
+    resetShortlistState()
+  }
+
   const clearShortlist = () => {
-    onClear()
-    clearRankings()
-    clearVetoes()
+    resetShortlistState()
   }
 
   const pickedMovie = pickedId ? movies.find((m) => m.id === pickedId) : null
@@ -142,6 +150,14 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
                     <span className="text-xs text-slate-400">{formatRuntime(movie.runtimeMinutes)}</span>
                     {vetoed ? <span className="ml-1.5 text-xs text-red-400">🚫 vetoed</span> : null}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailMovie(movie)}
+                    title="View details"
+                    className="px-1.5 text-slate-500 hover:text-slate-200"
+                  >
+                    ℹ️
+                  </button>
                   <button type="button" onClick={() => onRemove(movie.id)} className="px-2 text-slate-500 hover:text-red-400">
                     ✕
                   </button>
@@ -150,7 +166,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
             })}
           </div>
 
-          <VetoPanel movies={shortlistMovies} users={users} vetoes={vetoes} onSetVeto={setVeto} onClearVeto={clearVeto} />
+          <VetoPanel movies={shortlistMovies} users={users} vetoes={vetoes} onToggleVeto={toggleVeto} onClearVeto={clearVeto} />
 
           <SecretRanking
             movies={eligibleMovies}
@@ -158,24 +174,38 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
             rankings={rankings}
             onSubmit={submitRanking}
             onClearAll={clearRankings}
+            onMarkWatched={(movieId) => saveSession(movieId, 'consensus')}
           />
 
-          <button
-            type="button"
-            onClick={pickRandom}
-            disabled={rolling || eligibleMovies.length === 0}
-            className="rounded bg-emerald-600 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-          >
-            {rolling
-              ? 'Picking…'
-              : eligibleMovies.length === 0
-                ? 'Everything vetoed — undo one to roll'
-                : '🎲 Pick random'}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={pickRandom}
+              disabled={rolling || eligibleMovies.length === 0}
+              className="rounded bg-emerald-600 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+            >
+              {rolling
+                ? 'Picking…'
+                : eligibleMovies.length === 0
+                  ? 'Everything vetoed — undo one to roll'
+                  : '🎲 Pick random'}
+            </button>
+            {pickedMovie && pickMethod === 'random' ? (
+              <button
+                type="button"
+                onClick={() => saveSession(pickedMovie.id, 'random')}
+                className="rounded bg-slate-700 py-2 text-sm font-medium text-slate-100 hover:bg-slate-600"
+              >
+                ✓ Mark "{pickedMovie.title}" watched
+              </button>
+            ) : null}
+          </div>
 
           {pickedMovie ? (
             <div className="rounded-lg border border-emerald-600 bg-emerald-950/30 p-4">
-              <p className="text-sm text-emerald-300">Tonight's pick{pickMethod === 'manual' ? ' (manual)' : ''}:</p>
+              <p className="text-sm text-emerald-300">
+                Tonight's pick{pickMethod && pickMethod !== 'random' ? ` (${pickMethod})` : ''}:
+              </p>
               <p className="text-lg font-bold text-slate-100">{pickedMovie.title}</p>
 
               <div className="mt-3 flex flex-col gap-2">
@@ -220,7 +250,7 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
                 </label>
                 <button
                   type="button"
-                  onClick={saveSession}
+                  onClick={() => saveSession()}
                   className="mt-1 rounded bg-slate-100 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
                 >
                   Save & log this movie night
@@ -230,6 +260,22 @@ export function ShortlistView({ shortlist, onRemove, onClear }: Props) {
           ) : null}
         </>
       )}
+
+      {detailMovie ? (
+        <MovieFormModal
+          initial={detailMovie}
+          stats={statsFor(detailMovie.id)}
+          existingMovies={movies}
+          onMarkWatched={() => markWatchedToday(detailMovie.id)}
+          onClose={() => setDetailMovie(null)}
+          onSave={(data) => updateMovie(detailMovie.id, data)}
+          onDelete={() => {
+            deleteMovie(detailMovie.id)
+            onRemove(detailMovie.id)
+            setDetailMovie(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

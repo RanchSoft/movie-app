@@ -31,13 +31,25 @@ interface Props {
   initial: Movie | null
   stats: MovieStats | null
   existingMovies: Movie[]
-  onSave: (movie: Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>) => void
+  /** Returns the created movie for a brand-new save (so a "add to shortlist?" prompt can offer it) — edits return void. */
+  onSave: (movie: Omit<Movie, 'id' | 'addedAt' | 'updatedAt'>) => Movie | void
   onDelete?: () => void
   onMarkWatched?: () => void
+  /** When set, saving a brand-new title offers to add it straight to tonight's shortlist. */
+  onAddToShortlist?: (movieId: string) => void
   onClose: () => void
 }
 
-export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelete, onMarkWatched, onClose }: Props) {
+export function MovieFormModal({
+  initial,
+  stats,
+  existingMovies,
+  onSave,
+  onDelete,
+  onMarkWatched,
+  onAddToShortlist,
+  onClose,
+}: Props) {
   const { apiKey } = useTmdbKey()
   const { services: myServices, region } = useStreamingPrefs()
   const [kind, setKind] = useState<MovieKind>(initial?.kind ?? 'movie')
@@ -54,6 +66,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [streaming, setStreaming] = useState<StreamingAvailability[]>(initial?.availability.streaming ?? [])
   const [physical, setPhysical] = useState<PhysicalCopy[]>(initial?.availability.physical ?? [])
+  const [justAdded, setJustAdded] = useState<Movie | null>(null)
 
   const [tmdbQuery, setTmdbQuery] = useState('')
   const [tmdbResults, setTmdbResults] = useState<TmdbSearchResult[] | null>(null)
@@ -155,7 +168,7 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
 
   const handleSave = () => {
     if (!canSave) return
-    onSave({
+    const saved = onSave({
       kind,
       title: title.trim(),
       year: year ? Number(year) : undefined,
@@ -172,6 +185,44 @@ export function MovieFormModal({ initial, stats, existingMovies, onSave, onDelet
           .map((s) => ({ service: s.service.trim(), price: s.price, paid: s.price ? undefined : s.paid })),
       },
     })
+    if (!initial && saved && onAddToShortlist) {
+      setJustAdded(saved)
+    } else {
+      onClose()
+    }
+  }
+
+  if (justAdded) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center" onClick={onClose}>
+        <div
+          className="w-full max-w-sm rounded-t-xl border border-slate-700 bg-slate-900 p-5 sm:rounded-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-lg font-semibold text-slate-100">✓ Added "{justAdded.title}"</p>
+          <p className="mt-1 text-sm text-slate-400">Add it to tonight's shortlist too?</p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onAddToShortlist?.(justAdded.id)
+                onClose()
+              }}
+              className="flex-1 rounded bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              + Add to shortlist
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-600"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
