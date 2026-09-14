@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 
 const KEY = 'movie-picker:vetoes'
 
-/** userName -> the one movieId they've ruled out. */
-export type Vetoes = Record<string, string>
+/** userName -> the movieIds they've ruled out. */
+export type Vetoes = Record<string, string[]>
 
 function load(): Vetoes {
   try {
@@ -21,8 +21,12 @@ export function useVetoes() {
     localStorage.setItem(KEY, JSON.stringify(vetoes))
   }, [vetoes])
 
-  const setVeto = useCallback((user: string, movieId: string) => {
-    setVetoes((prev) => ({ ...prev, [user]: movieId }))
+  const toggleVeto = useCallback((user: string, movieId: string) => {
+    setVetoes((prev) => {
+      const current = prev[user] ?? []
+      const next = current.includes(movieId) ? current.filter((id) => id !== movieId) : [...current, movieId]
+      return { ...prev, [user]: next }
+    })
   }, [])
 
   const clearVeto = useCallback((user: string) => {
@@ -36,5 +40,5 @@ export function useVetoes() {
 
   const clearAll = useCallback(() => setVetoes({}), [])
 
-  return { vetoes, setVeto, clearVeto, clearAll }
+  return { vetoes, toggleVeto, clearVeto, clearAll }
 }
